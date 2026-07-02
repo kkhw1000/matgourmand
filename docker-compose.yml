@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+
+  ai:
+    build:
+      context: ./ai
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+      - ai
