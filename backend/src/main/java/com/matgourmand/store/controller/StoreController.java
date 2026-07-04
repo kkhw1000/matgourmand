@@ -1,5 +1,6 @@
 package com.matgourmand.store.controller;
 
+import com.matgourmand.common.response.ApiResponse;
 import com.matgourmand.store.dto.StoreCreateRequest;
 import com.matgourmand.store.dto.StoreResponse;
 import com.matgourmand.store.dto.StoreStatusUpdateRequest;
@@ -29,35 +30,36 @@ public class StoreController {
     }
 
     @PostMapping
-    public ResponseEntity<StoreResponse> createStore(@Valid @RequestBody StoreCreateRequest request) {
+    public ResponseEntity<ApiResponse<StoreResponse>> createStore(@Valid @RequestBody StoreCreateRequest request) {
         StoreResponse response = storeService.createStore(request);
-        return ResponseEntity.created(URI.create("/api/stores/" + response.id())).body(response);
+        return ResponseEntity.created(URI.create("/api/stores/" + response.id()))
+                .body(ApiResponse.ok(response));
     }
 
     @GetMapping("/{storeId}")
-    public ResponseEntity<StoreResponse> getStore(@PathVariable Long storeId) {
-        return ResponseEntity.ok(storeService.getStore(storeId));
+    public ResponseEntity<ApiResponse<StoreResponse>> getStore(@PathVariable Long storeId) {
+        return ResponseEntity.ok(ApiResponse.ok(storeService.getStore(storeId)));
     }
 
     @GetMapping
-    public ResponseEntity<List<StoreResponse>> getStores() {
-        return ResponseEntity.ok(storeService.getStores());
+    public ResponseEntity<ApiResponse<List<StoreResponse>>> getStores() {
+        return ResponseEntity.ok(ApiResponse.ok(storeService.getStores()));
     }
 
     @PutMapping("/{storeId}")
-    public ResponseEntity<StoreResponse> updateStore(
+    public ResponseEntity<ApiResponse<StoreResponse>> updateStore(
             @PathVariable Long storeId,
             @Valid @RequestBody StoreUpdateRequest request
     ) {
-        return ResponseEntity.ok(storeService.updateStore(storeId, request));
+        return ResponseEntity.ok(ApiResponse.ok(storeService.updateStore(storeId, request)));
     }
 
     @PutMapping("/{storeId}/status")
-    public ResponseEntity<StoreResponse> changeStoreStatus(
+    public ResponseEntity<ApiResponse<StoreResponse>> changeStoreStatus(
             @PathVariable Long storeId,
             @Valid @RequestBody StoreStatusUpdateRequest request
     ) {
-        return ResponseEntity.ok(storeService.changeStoreStatus(storeId, request));
+        return ResponseEntity.ok(ApiResponse.ok(storeService.changeStoreStatus(storeId, request)));
     }
 
     @DeleteMapping("/{storeId}")

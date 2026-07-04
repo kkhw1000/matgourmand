@@ -15,9 +15,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 @Entity
 @Table(name = "stores")
+@Getter
 public class Store extends BaseTimeEntity {
 
     @Id
@@ -86,31 +88,4 @@ public class Store extends BaseTimeEntity {
         return value == null || value.isBlank();
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public User getOwner() {
-        return owner;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getAddress() {
-        return address;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public StoreStatus getStatus() {
-        return status;
-    }
 }

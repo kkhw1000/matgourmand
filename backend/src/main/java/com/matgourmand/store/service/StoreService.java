@@ -11,20 +11,18 @@ import com.matgourmand.store.repository.StoreRepository;
 import com.matgourmand.user.domain.User;
 import com.matgourmand.user.repository.UserRepository;
 import java.util.List;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class StoreService {
 
     private final StoreRepository storeRepository;
     private final UserRepository userRepository;
-
-    public StoreService(StoreRepository storeRepository, UserRepository userRepository) {
-        this.storeRepository = storeRepository;
-        this.userRepository = userRepository;
-    }
 
     @Transactional
     public StoreResponse createStore(StoreCreateRequest request) {
