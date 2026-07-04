@@ -15,11 +15,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "stores")
 @Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Store extends BaseTimeEntity {
 
     @Id
@@ -44,9 +47,6 @@ public class Store extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StoreStatus status;
-
-    protected Store() {
-    }
 
     private Store(User owner, String name, String address, String phone, String description, StoreStatus status) {
         this.owner = owner;

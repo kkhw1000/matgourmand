@@ -18,7 +18,9 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(
@@ -26,6 +28,7 @@ import lombok.Getter;
         uniqueConstraints = @UniqueConstraint(columnNames = {"store_id", "day_of_week"})
 )
 @Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BusinessHour extends BaseTimeEntity {
 
     @Id
@@ -46,9 +49,6 @@ public class BusinessHour extends BaseTimeEntity {
 
     @Column(name = "is_closed", nullable = false)
     private boolean closed;
-
-    protected BusinessHour() {
-    }
 
     private BusinessHour(Store store, DayOfWeek dayOfWeek, LocalTime openTime, LocalTime closeTime, boolean closed) {
         this.store = store;
