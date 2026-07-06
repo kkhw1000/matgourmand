@@ -1,5 +1,7 @@
 package com.matgourmand.businesshour.controller;
 
+import com.matgourmand.auth.AuthenticatedUser;
+import com.matgourmand.auth.CurrentUser;
 import com.matgourmand.businesshour.dto.BusinessHourResponse;
 import com.matgourmand.businesshour.dto.BusinessHourUpsertRequest;
 import com.matgourmand.businesshour.service.BusinessHourService;
@@ -30,10 +32,13 @@ public class BusinessHourController {
 
     @PutMapping("/{dayOfWeek}")
     public ResponseEntity<ApiResponse<BusinessHourResponse>> upsertBusinessHour(
+            @CurrentUser AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
             @PathVariable DayOfWeek dayOfWeek,
             @Valid @RequestBody BusinessHourUpsertRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(businessHourService.upsertBusinessHour(storeId, dayOfWeek, request)));
+        return ResponseEntity.ok(ApiResponse.ok(
+                businessHourService.upsertBusinessHour(authenticatedUser, storeId, dayOfWeek, request)
+        ));
     }
 }

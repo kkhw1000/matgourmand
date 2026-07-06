@@ -58,6 +58,10 @@ public class User extends BaseTimeEntity {
         return new User(email, password, name, phone, UserRole.CUSTOMER);
     }
 
+    public boolean hasRole(UserRole role) {
+        return this.role == role;
+    }
+
     private static void validateRequiredValues(String email, String password, String name) {
         if (isBlank(email) || isBlank(password) || isBlank(name)) {
             throw new BadRequestException(ErrorCode.USER_REQUIRED);

@@ -1,5 +1,7 @@
 package com.matgourmand.store.controller;
 
+import com.matgourmand.auth.AuthenticatedUser;
+import com.matgourmand.auth.CurrentUser;
 import com.matgourmand.common.response.ApiResponse;
 import com.matgourmand.store.dto.StoreCreateRequest;
 import com.matgourmand.store.dto.StoreResponse;
@@ -30,8 +32,11 @@ public class StoreController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<StoreResponse>> createStore(@Valid @RequestBody StoreCreateRequest request) {
-        StoreResponse response = storeService.createStore(request);
+    public ResponseEntity<ApiResponse<StoreResponse>> createStore(
+            @CurrentUser AuthenticatedUser authenticatedUser,
+            @Valid @RequestBody StoreCreateRequest request
+    ) {
+        StoreResponse response = storeService.createStore(authenticatedUser, request);
         return ResponseEntity.created(URI.create("/api/stores/" + response.id()))
                 .body(ApiResponse.ok(response));
     }
@@ -48,23 +53,30 @@ public class StoreController {
 
     @PutMapping("/{storeId}")
     public ResponseEntity<ApiResponse<StoreResponse>> updateStore(
+            @CurrentUser AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
             @Valid @RequestBody StoreUpdateRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(storeService.updateStore(storeId, request)));
+        return ResponseEntity.ok(ApiResponse.ok(storeService.updateStore(authenticatedUser, storeId, request)));
     }
 
     @PutMapping("/{storeId}/status")
     public ResponseEntity<ApiResponse<StoreResponse>> changeStoreStatus(
+            @CurrentUser AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
             @Valid @RequestBody StoreStatusUpdateRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(storeService.changeStoreStatus(storeId, request)));
+        return ResponseEntity.ok(ApiResponse.ok(
+                storeService.changeStoreStatus(authenticatedUser, storeId, request)
+        ));
     }
 
     @DeleteMapping("/{storeId}")
-    public ResponseEntity<Void> deleteStore(@PathVariable Long storeId) {
-        storeService.deleteStore(storeId);
+    public ResponseEntity<Void> deleteStore(
+            @CurrentUser AuthenticatedUser authenticatedUser,
+            @PathVariable Long storeId
+    ) {
+        storeService.deleteStore(authenticatedUser, storeId);
         return ResponseEntity.noContent().build();
     }
 }

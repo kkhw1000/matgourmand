@@ -1,5 +1,7 @@
 package com.matgourmand.reservation.controller;
 
+import com.matgourmand.auth.AuthenticatedUser;
+import com.matgourmand.auth.CurrentUser;
 import com.matgourmand.common.response.ApiResponse;
 import com.matgourmand.reservation.dto.ReservationCreateRequest;
 import com.matgourmand.reservation.dto.ReservationResponse;
@@ -14,7 +16,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -25,25 +26,39 @@ public class ReservationController {
 
     @PostMapping("/api/reservations")
     public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(
+            @CurrentUser AuthenticatedUser authenticatedUser,
             @Valid @RequestBody ReservationCreateRequest request
     ) {
-        ReservationResponse response = reservationService.createReservation(request);
+        ReservationResponse response = reservationService.createReservation(authenticatedUser, request);
         return ResponseEntity.created(URI.create("/api/reservations/" + response.id()))
                 .body(ApiResponse.ok(response));
     }
 
     @GetMapping("/api/reservations/{reservationId}")
-    public ResponseEntity<ApiResponse<ReservationResponse>> getReservation(@PathVariable Long reservationId) {
-        return ResponseEntity.ok(ApiResponse.ok(reservationService.getReservation(reservationId)));
+    public ResponseEntity<ApiResponse<ReservationResponse>> getReservation(
+            @CurrentUser AuthenticatedUser authenticatedUser,
+            @PathVariable Long reservationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(reservationService.getReservation(authenticatedUser, reservationId)));
     }
 
     @GetMapping("/api/stores/{storeId}/reservations")
-    public ResponseEntity<ApiResponse<List<ReservationResponse>>> getStoreReservations(@PathVariable Long storeId) {
-        return ResponseEntity.ok(ApiResponse.ok(reservationService.getStoreReservations(storeId)));
+    public ResponseEntity<ApiResponse<List<ReservationResponse>>> getStoreReservations(
+            @CurrentUser AuthenticatedUser authenticatedUser,
+            @PathVariable Long storeId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                reservationService.getStoreReservations(authenticatedUser, storeId)
+        ));
     }
 
     @PutMapping("/api/reservations/{reservationId}/cancel")
-    public ResponseEntity<ApiResponse<ReservationResponse>> cancelReservation(@PathVariable Long reservationId) {
-        return ResponseEntity.ok(ApiResponse.ok(reservationService.cancelReservation(reservationId)));
+    public ResponseEntity<ApiResponse<ReservationResponse>> cancelReservation(
+            @CurrentUser AuthenticatedUser authenticatedUser,
+            @PathVariable Long reservationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                reservationService.cancelReservation(authenticatedUser, reservationId)
+        ));
     }
 }
