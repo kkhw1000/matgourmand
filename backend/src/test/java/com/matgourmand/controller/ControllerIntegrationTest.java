@@ -7,9 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.matgourmand.auth.AuthTokenFilter;
-import com.matgourmand.auth.PasswordHasher;
 import com.matgourmand.auth.AuthTokenService;
+import com.matgourmand.auth.PasswordHasher;
 import com.matgourmand.businesshour.domain.BusinessHour;
 import com.matgourmand.businesshour.repository.BusinessHourRepository;
 import com.matgourmand.store.domain.Store;
@@ -24,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,9 +40,6 @@ class ControllerIntegrationTest {
     private AuthTokenService authTokenService;
 
     @Autowired
-    private AuthTokenFilter authTokenFilter;
-
-    @Autowired
     private PasswordHasher passwordHasher;
 
     @Autowired
@@ -54,12 +51,15 @@ class ControllerIntegrationTest {
     @Autowired
     private BusinessHourRepository businessHourRepository;
 
+    @Autowired
+    private FilterChainProxy springSecurityFilterChain;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .addFilters(authTokenFilter)
+                .addFilters(springSecurityFilterChain)
                 .build();
     }
 

@@ -8,6 +8,11 @@ import com.matgourmand.store.dto.StoreResponse;
 import com.matgourmand.store.dto.StoreStatusUpdateRequest;
 import com.matgourmand.store.dto.StoreUpdateRequest;
 import com.matgourmand.store.service.StoreService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -23,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/stores")
+@Tag(name = "Store", description = "Store management APIs")
 public class StoreController {
 
     private final StoreService storeService;
@@ -32,6 +38,25 @@ public class StoreController {
     }
 
     @PostMapping
+    @Operation(summary = "Create store", description = "Create a store with the authenticated OWNER account")
+    @SecurityRequirement(name = "bearerAuth")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                            name = "Store create",
+                            value = """
+                                    {
+                                      "name": "MatGourmand Bistro",
+                                      "address": "서울 성수동 123-45",
+                                      "phone": "02-123-4567",
+                                      "description": "프렌치 코스와 내추럴 와인을 중심으로 운영하는 예약제 비스트로"
+                                    }
+                                    """
+                    )
+            )
+    )
     public ResponseEntity<ApiResponse<StoreResponse>> createStore(
             @CurrentUser AuthenticatedUser authenticatedUser,
             @Valid @RequestBody StoreCreateRequest request
@@ -42,16 +67,20 @@ public class StoreController {
     }
 
     @GetMapping("/{storeId}")
+    @Operation(summary = "Get store", description = "Retrieve a single store by ID")
     public ResponseEntity<ApiResponse<StoreResponse>> getStore(@PathVariable Long storeId) {
         return ResponseEntity.ok(ApiResponse.ok(storeService.getStore(storeId)));
     }
 
     @GetMapping
+    @Operation(summary = "Get stores", description = "Retrieve all stores")
     public ResponseEntity<ApiResponse<List<StoreResponse>>> getStores() {
         return ResponseEntity.ok(ApiResponse.ok(storeService.getStores()));
     }
 
     @PutMapping("/{storeId}")
+    @Operation(summary = "Update store", description = "Update a store owned by the authenticated OWNER")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<StoreResponse>> updateStore(
             @CurrentUser AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
@@ -61,6 +90,8 @@ public class StoreController {
     }
 
     @PutMapping("/{storeId}/status")
+    @Operation(summary = "Change store status", description = "Change the status of a store owned by the authenticated OWNER")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<StoreResponse>> changeStoreStatus(
             @CurrentUser AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
@@ -72,6 +103,8 @@ public class StoreController {
     }
 
     @DeleteMapping("/{storeId}")
+    @Operation(summary = "Delete store", description = "Delete a store owned by the authenticated OWNER")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteStore(
             @CurrentUser AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId
