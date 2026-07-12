@@ -8,7 +8,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
@@ -42,12 +46,20 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
                 String accessToken = authorizationHeader.substring(BEARER_PREFIX.length());
                 AuthenticatedUser authenticatedUser = authTokenService.parseAccessToken(accessToken);
-                request.setAttribute(AuthConstants.AUTHENTICATED_USER_ATTRIBUTE, authenticatedUser);
+                UsernamePasswordAuthenticationToken authenticationToken =
+                        UsernamePasswordAuthenticationToken.authenticated(
+                                authenticatedUser,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_" + authenticatedUser.role().name()))
+                        );
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
             }
 
             filterChain.doFilter(request, response);
         } catch (BusinessException exception) {
             handlerExceptionResolver.resolveException(request, response, null, exception);
+        } finally {
+            SecurityContextHolder.clearContext();
         }
     }
 }

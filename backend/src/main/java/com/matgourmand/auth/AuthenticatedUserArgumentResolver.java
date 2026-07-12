@@ -1,9 +1,8 @@
 package com.matgourmand.auth;
 
-import com.matgourmand.common.exception.ErrorCode;
-import com.matgourmand.common.exception.UnauthorizedException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -26,12 +25,9 @@ public class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentR
             NativeWebRequest webRequest,
             WebDataBinderFactory binderFactory
     ) {
-        HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
-        AuthenticatedUser authenticatedUser =
-                (AuthenticatedUser) request.getAttribute(AuthConstants.AUTHENTICATED_USER_ATTRIBUTE);
-
-        if (authenticatedUser == null) {
-            throw new UnauthorizedException(ErrorCode.AUTH_REQUIRED);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser authenticatedUser)) {
+            return null;
         }
 
         return authenticatedUser;

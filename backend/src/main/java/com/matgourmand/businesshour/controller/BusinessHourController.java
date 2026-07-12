@@ -7,6 +7,8 @@ import com.matgourmand.businesshour.dto.BusinessHourUpsertRequest;
 import com.matgourmand.businesshour.service.BusinessHourService;
 import com.matgourmand.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,6 +40,22 @@ public class BusinessHourController {
     @PutMapping("/{dayOfWeek}")
     @Operation(summary = "Upsert business hour", description = "Create or update business hours for the authenticated OWNER's store")
     @SecurityRequirement(name = "bearerAuth")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                            name = "Business hour upsert",
+                            value = """
+                                    {
+                                      "openTime": "12:00:00",
+                                      "closeTime": "22:00:00",
+                                      "closed": false
+                                    }
+                                    """
+                    )
+            )
+    )
     public ResponseEntity<ApiResponse<BusinessHourResponse>> upsertBusinessHour(
             @CurrentUser AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,

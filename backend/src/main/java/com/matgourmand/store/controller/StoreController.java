@@ -9,6 +9,8 @@ import com.matgourmand.store.dto.StoreStatusUpdateRequest;
 import com.matgourmand.store.dto.StoreUpdateRequest;
 import com.matgourmand.store.service.StoreService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,6 +40,23 @@ public class StoreController {
     @PostMapping
     @Operation(summary = "Create store", description = "Create a store with the authenticated OWNER account")
     @SecurityRequirement(name = "bearerAuth")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                            name = "Store create",
+                            value = """
+                                    {
+                                      "name": "MatGourmand Bistro",
+                                      "address": "서울 성수동 123-45",
+                                      "phone": "02-123-4567",
+                                      "description": "프렌치 코스와 내추럴 와인을 중심으로 운영하는 예약제 비스트로"
+                                    }
+                                    """
+                    )
+            )
+    )
     public ResponseEntity<ApiResponse<StoreResponse>> createStore(
             @CurrentUser AuthenticatedUser authenticatedUser,
             @Valid @RequestBody StoreCreateRequest request
