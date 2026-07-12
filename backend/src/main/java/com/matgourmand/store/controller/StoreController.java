@@ -1,7 +1,6 @@
 package com.matgourmand.store.controller;
 
 import com.matgourmand.auth.AuthenticatedUser;
-import com.matgourmand.auth.CurrentUser;
 import com.matgourmand.common.response.ApiResponse;
 import com.matgourmand.store.dto.StoreCreateRequest;
 import com.matgourmand.store.dto.StoreResponse;
@@ -17,6 +16,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,7 +58,7 @@ public class StoreController {
             )
     )
     public ResponseEntity<ApiResponse<StoreResponse>> createStore(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @Valid @RequestBody StoreCreateRequest request
     ) {
         StoreResponse response = storeService.createStore(authenticatedUser, request);
@@ -82,7 +82,7 @@ public class StoreController {
     @Operation(summary = "Update store", description = "Update a store owned by the authenticated OWNER")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<StoreResponse>> updateStore(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
             @Valid @RequestBody StoreUpdateRequest request
     ) {
@@ -93,7 +93,7 @@ public class StoreController {
     @Operation(summary = "Change store status", description = "Change the status of a store owned by the authenticated OWNER")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<StoreResponse>> changeStoreStatus(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
             @Valid @RequestBody StoreStatusUpdateRequest request
     ) {
@@ -106,7 +106,7 @@ public class StoreController {
     @Operation(summary = "Delete store", description = "Delete a store owned by the authenticated OWNER")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteStore(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId
     ) {
         storeService.deleteStore(authenticatedUser, storeId);
