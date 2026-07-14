@@ -1,7 +1,6 @@
 package com.matgourmand.reservation.controller;
 
 import com.matgourmand.auth.AuthenticatedUser;
-import com.matgourmand.auth.CurrentUser;
 import com.matgourmand.common.response.ApiResponse;
 import com.matgourmand.reservation.dto.ReservationCreateRequest;
 import com.matgourmand.reservation.dto.ReservationResponse;
@@ -16,6 +15,7 @@ import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -51,7 +51,7 @@ public class ReservationController {
             )
     )
     public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @Valid @RequestBody ReservationCreateRequest request
     ) {
         ReservationResponse response = reservationService.createReservation(authenticatedUser, request);
@@ -63,7 +63,7 @@ public class ReservationController {
     @Operation(summary = "Get reservation", description = "Retrieve a reservation visible to the reservation customer or store owner")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<ReservationResponse>> getReservation(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long reservationId
     ) {
         return ResponseEntity.ok(ApiResponse.ok(reservationService.getReservation(authenticatedUser, reservationId)));
@@ -73,7 +73,7 @@ public class ReservationController {
     @Operation(summary = "Get store reservations", description = "Retrieve reservations for a store owned by the authenticated OWNER")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<List<ReservationResponse>>> getStoreReservations(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId
     ) {
         return ResponseEntity.ok(ApiResponse.ok(
@@ -85,7 +85,7 @@ public class ReservationController {
     @Operation(summary = "Cancel reservation", description = "Cancel a reservation as the authenticated CUSTOMER")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<ReservationResponse>> cancelReservation(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long reservationId
     ) {
         return ResponseEntity.ok(ApiResponse.ok(

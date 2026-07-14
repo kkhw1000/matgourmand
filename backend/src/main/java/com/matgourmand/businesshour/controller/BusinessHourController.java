@@ -1,7 +1,6 @@
 package com.matgourmand.businesshour.controller;
 
 import com.matgourmand.auth.AuthenticatedUser;
-import com.matgourmand.auth.CurrentUser;
 import com.matgourmand.businesshour.dto.BusinessHourResponse;
 import com.matgourmand.businesshour.dto.BusinessHourUpsertRequest;
 import com.matgourmand.businesshour.service.BusinessHourService;
@@ -16,6 +15,7 @@ import java.time.DayOfWeek;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -57,7 +57,7 @@ public class BusinessHourController {
             )
     )
     public ResponseEntity<ApiResponse<BusinessHourResponse>> upsertBusinessHour(
-            @CurrentUser AuthenticatedUser authenticatedUser,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long storeId,
             @PathVariable DayOfWeek dayOfWeek,
             @Valid @RequestBody BusinessHourUpsertRequest request
