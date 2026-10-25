@@ -135,6 +135,40 @@ class ReservationServiceTest {
                 .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
+    @Test
+    void availableTimesReflectPartySizeAndExistingReservations() {
+        User owner = userRepository.save(User.createOwner("slot-owner@test.com", "encoded-password", "Owner", null));
+        User customer = userRepository.save(User.createCustomer("slot-customer@test.com", "encoded-password", "Customer", null));
+        Store store = storeRepository.save(Store.create(owner, "Store", "Seoul", null, null,
+                "성수", "프렌치", 40000, 4));
+        businessHourRepository.save(BusinessHour.create(store, DayOfWeek.MONDAY,
+                LocalTime.of(18, 0), LocalTime.of(19, 0), false));
+        LocalDate date = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+        reservationRepository.save(Reservation.create(store, customer, date.atTime(18, 0), 3, null));
+
+        assertThat(reservationService.getAvailableTimes(store.getId(), date, 2))
+                .containsExactly("18:30");
+        assertThatThrownBy(() -> reservationService.createReservation(authenticatedUser(customer),
+                new ReservationCreateRequest(store.getId(), date.atTime(18, 0), 2, null)))
+                .isInstanceOf(BadRequestException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RESERVATION_SLOT_FULL);
+    }
+
+    @Test
+    void myReservationsContainOnlyCurrentCustomersBookings() {
+        User owner = userRepository.save(User.createOwner("list-owner@test.com", "encoded-password", "Owner", null));
+        User customer = userRepository.save(User.createCustomer("list-customer@test.com", "encoded-password", "Customer", null));
+        User another = userRepository.save(User.createCustomer("list-another@test.com", "encoded-password", "Another", null));
+        Store store = storeRepository.save(Store.create(owner, "Store", "Seoul", null, null));
+        reservationRepository.save(Reservation.create(store, customer, nextDayOfWeekAt(DayOfWeek.MONDAY, 18, 0), 2, null));
+        reservationRepository.save(Reservation.create(store, another, nextDayOfWeekAt(DayOfWeek.MONDAY, 19, 0), 2, null));
+
+        assertThat(reservationService.getMyReservations(authenticatedUser(customer)))
+                .hasSize(1)
+                .allMatch(reservation -> reservation.customerId().equals(customer.getId()));
+    }
+
     private AuthenticatedUser authenticatedUser(User user) {
         return new AuthenticatedUser(user.getId(), user.getRole());
     }

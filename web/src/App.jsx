@@ -1,172 +1,291 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import AuthPage from "./AuthPage";
+import StoreDetailPage from "./StoreDetailPage";
+import SiteHeader from "./SiteHeader";
+import ReservationPage from "./ReservationPage";
+import ReservationListPage from "./ReservationListPage";
+import { apiRequest } from "./api";
+import { mapStore } from "./storeData";
 
-const allRegions = [
-  "성수",
-  "성수동",
-  "서울숲",
-  "한남",
-  "한남동",
-  "연남",
-  "연남동",
-  "망원",
-  "망원동",
-  "강남",
-  "역삼",
-  "압구정",
-  "을지로",
-  "서촌",
-  "합정"
+const priceRanges = [
+  { key: "under-20000", label: "2만원 미만", min: 0, max: 20000 },
+  { key: "20000-39999", label: "2~4만원", min: 20000, max: 40000 },
+  { key: "40000-59999", label: "4~6만원", min: 40000, max: 60000 },
+  { key: "over-60000", label: "6만원 이상", min: 60000, max: Infinity }
 ];
 
 const filters = [
-  { key: "top-rated", label: "평점 높은 순" },
-  { key: "available-now", label: "지금 예약 가능" },
-  { key: "date", label: "데이트" },
-  { key: "group", label: "모임" }
+  { key: "available-now", label: "예약 접수 중" }
 ];
 
-const stores = [
-  {
-    id: "seongsu-brunch",
-    region: "성수",
-    name: "몽트 브런치",
-    rating: 4.8,
-    reviewCount: 128,
-    summary: "햇살 좋은 브런치 · 친구 모임",
-    availableNow: true,
-    vibeTags: ["브런치", "모임"],
-    thumbnail: "bg-[linear-gradient(135deg,#f7d6c2_0%,#df8f67_100%)]",
-    reservationTimes: ["11:30", "12:00", "13:30", "14:00"]
-  },
-  {
-    id: "seongsu-pasta",
-    region: "성수",
-    name: "로사 파스타바",
-    rating: 4.6,
-    reviewCount: 94,
-    summary: "조용한 파스타바 · 데이트 추천",
-    availableNow: false,
-    vibeTags: ["데이트"],
-    thumbnail: "bg-[linear-gradient(135deg,#ead8d1_0%,#c9733c_100%)]",
-    reservationTimes: ["18:00", "19:30", "20:30"]
-  },
-  {
-    id: "hannam-french",
-    region: "한남",
-    name: "한남동 프렌치 다이닝",
-    rating: 4.9,
-    reviewCount: 211,
-    summary: "차분한 저녁 · 코스 중심",
-    availableNow: true,
-    vibeTags: ["데이트"],
-    thumbnail: "bg-[linear-gradient(135deg,#f1d4cd_0%,#b74141_100%)]",
-    reservationTimes: ["17:30", "18:30", "19:30"]
-  },
-  {
-    id: "hannam-steak",
-    region: "한남",
-    name: "오크 스테이크 하우스",
-    rating: 4.7,
-    reviewCount: 87,
-    summary: "스테이크 · 기념일 저녁",
-    availableNow: true,
-    vibeTags: ["데이트", "모임"],
-    thumbnail: "bg-[linear-gradient(135deg,#f2ddd8_0%,#8b3d3d_100%)]",
-    reservationTimes: ["18:00", "19:00", "20:00"]
-  },
-  {
-    id: "yeonnam-wine",
-    region: "연남",
-    name: "노을 와인바",
-    rating: 4.8,
-    reviewCount: 156,
-    summary: "와인바 · 감도 높은 분위기",
-    availableNow: false,
-    vibeTags: ["데이트"],
-    thumbnail: "bg-[linear-gradient(135deg,#f5d9d2_0%,#cc6262_100%)]",
-    reservationTimes: ["18:30", "20:00", "21:00"]
-  },
-  {
-    id: "gangnam-group",
-    region: "강남",
-    name: "모노 키친",
-    rating: 4.5,
-    reviewCount: 73,
-    summary: "단체 모임 · 메뉴 고르기 쉬운 곳",
-    availableNow: true,
-    vibeTags: ["모임"],
-    thumbnail: "bg-[linear-gradient(135deg,#f3e0da_0%,#d07171_100%)]",
-    reservationTimes: ["17:00", "18:30", "19:00", "20:30"]
-  }
+const sortOptions = [
+  { key: "recommended", label: "추천순" },
+  { key: "price-low", label: "가격 낮은 순" },
+  { key: "price-high", label: "가격 높은 순" }
 ];
 
-const partySizes = [1, 2, 3, 4, 5, "6+"];
+const partySizes = [1, 2, 3, 4, 5, 6];
 
 const highlightBullets = [
-  "지역 먼저 고르기",
-  "필터로 빠르게 정리",
-  "바로 예약 신청"
+  "지역별로 발견하기",
+  "음식 취향으로 좁히기",
+  "예산에 맞춰 선택하기"
 ];
 
-export default function App() {
-  const [regionQuery, setRegionQuery] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState("");
-  const [selectedFilters, setSelectedFilters] = useState([]);
-  const [selectedStoreId, setSelectedStoreId] = useState("");
-  const [selectedTime, setSelectedTime] = useState("");
-  const [selectedPartySize, setSelectedPartySize] = useState(2);
+function tomorrowDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
+function getReservationDraft() {
+  try {
+    return JSON.parse(window.sessionStorage.getItem("matgourmand-reservation-draft"));
+  } catch {
+    return null;
+  }
+}
+
+function getRoute() {
+  const route = window.location.hash.slice(1) || "/";
+  return route.startsWith("/") ? route : "/";
+}
+
+export default function App() {
+  const [route, setRoute] = useState(getRoute);
+  const [stores, setStores] = useState([]);
+  const [storesLoading, setStoresLoading] = useState(true);
+  const [storesError, setStoresError] = useState("");
+  const [storesReloadKey, setStoresReloadKey] = useState(0);
+  const [session, setSession] = useState(() => {
+    try {
+      return JSON.parse(window.sessionStorage.getItem("matgourmand-session")) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => setRoute(getRoute());
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setStoresLoading(true);
+    setStoresError("");
+    apiRequest("/api/stores", { signal: controller.signal })
+      .then((data) => setStores(data.filter((store) => store.status !== "HIDDEN").map(mapStore)))
+      .catch((error) => {
+        if (error.name !== "AbortError") setStoresError(error instanceof TypeError ? "서버에 연결할 수 없습니다." : error.message);
+      })
+      .finally(() => { if (!controller.signal.aborted) setStoresLoading(false); });
+    return () => controller.abort();
+  }, [storesReloadKey]);
+
+  const navigate = (path) => {
+    window.location.hash = path;
+    setRoute(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleAuthenticated = (auth) => {
+    const nextSession = { accessToken: auth.accessToken, user: auth.user };
+    window.sessionStorage.setItem("matgourmand-session", JSON.stringify(nextSession));
+    setSession(nextSession);
+    const returnTo = window.sessionStorage.getItem("matgourmand-return-to") || "/";
+    window.sessionStorage.removeItem("matgourmand-return-to");
+    navigate(returnTo);
+  };
+
+  const handleLogout = () => {
+    window.sessionStorage.removeItem("matgourmand-session");
+    setSession(null);
+  };
+
+  const header = (
+    <SiteHeader navigate={navigate} session={session} onLogout={handleLogout} />
+  );
+
+  if (route === "/login" || route === "/signup") {
+    return (
+      <AuthPage
+        key={route}
+        mode={route === "/login" ? "login" : "signup"}
+        navigate={navigate}
+        onAuthenticated={handleAuthenticated}
+        header={header}
+      />
+    );
+  }
+
+  if (route.startsWith("/stores/")) {
+    const storeId = decodeURIComponent(route.slice("/stores/".length));
+    return (
+      <StoreDetailPage
+        storeId={storeId}
+        navigate={navigate}
+        header={header}
+      />
+    );
+  }
+
+  if (route === "/reservations") {
+    return <ReservationListPage session={session} navigate={navigate} header={header} />;
+  }
+
+  if (route.startsWith("/reservations/")) {
+    const reservationId = decodeURIComponent(route.slice("/reservations/".length).replace(/\/complete$/, ""));
+    return (
+      <ReservationPage
+        reservationId={reservationId}
+        isComplete={route.endsWith("/complete")}
+        draft={getReservationDraft()}
+        session={session}
+        navigate={navigate}
+        header={header}
+      />
+    );
+  }
+
+  const requestedStoreId = new URLSearchParams(route.split("?")[1] || "").get("store");
+  return <HomePage navigate={navigate} header={header} initialStoreId={requestedStoreId} stores={stores} loading={storesLoading} error={storesError} retry={() => setStoresReloadKey((key) => key + 1)} />;
+}
+
+function HomePage({ navigate, header, initialStoreId, stores, loading, error, retry }) {
+  const initialStore = stores.find((store) => store.id === initialStoreId);
+  const initialDraft = getReservationDraft();
+  const matchingDraft = String(initialDraft?.storeId) === initialStoreId ? initialDraft : null;
+  const [regionQuery, setRegionQuery] = useState(initialStore?.region || "");
+  const [selectedRegion, setSelectedRegion] = useState(initialStore?.region || "");
+  const [selectedTheme, setSelectedTheme] = useState("");
+  const [selectedPrice, setSelectedPrice] = useState("");
+  const [selectedFilters, setSelectedFilters] = useState([]);
+  const [sortBy, setSortBy] = useState("recommended");
+  const [selectedStoreId, setSelectedStoreId] = useState(initialStoreId || "");
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [selectedTime, setSelectedTime] = useState(matchingDraft?.partySize ? matchingDraft.time || "" : "");
+  const [selectedPartySize, setSelectedPartySize] = useState(matchingDraft?.partySize || null);
+  const [selectedDate, setSelectedDate] = useState(matchingDraft?.date >= tomorrowDate() ? matchingDraft.date : tomorrowDate);
+  const [requestNote, setRequestNote] = useState(matchingDraft?.requestNote || "");
+  const [availableTimes, setAvailableTimes] = useState([]);
+  const [timesLoading, setTimesLoading] = useState(false);
+  const [timesError, setTimesError] = useState("");
+  const [timesReloadKey, setTimesReloadKey] = useState(0);
+  const dialogRef = useRef(null);
+  const triggerRef = useRef(null);
+
+  useEffect(() => {
+    const store = stores.find((item) => item.id === initialStoreId);
+    if (store) {
+      setRegionQuery(store.region);
+      setSelectedRegion(store.region);
+      setSelectedStoreId(store.id);
+      setShowReservationModal(true);
+    }
+  }, [initialStoreId, stores]);
+
+  useEffect(() => {
+    if (!showReservationModal || !selectedStoreId || !selectedDate || !selectedPartySize) {
+      setAvailableTimes([]);
+      setTimesError("");
+      return;
+    }
+    const controller = new AbortController();
+    setTimesLoading(true);
+    setTimesError("");
+    apiRequest(`/api/stores/${encodeURIComponent(selectedStoreId)}/available-times?date=${encodeURIComponent(selectedDate)}&partySize=${selectedPartySize}`, { signal: controller.signal })
+      .then((times) => {
+        setAvailableTimes(times);
+        setSelectedTime((current) => times.includes(current) ? current : "");
+      })
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") {
+          setAvailableTimes([]);
+          setSelectedTime("");
+          setTimesError(requestError instanceof TypeError ? "서버에 연결할 수 없습니다." : requestError.message);
+        }
+      })
+      .finally(() => { if (!controller.signal.aborted) setTimesLoading(false); });
+    return () => controller.abort();
+  }, [showReservationModal, selectedStoreId, selectedDate, selectedPartySize, timesReloadKey]);
+
+  useEffect(() => {
+    if (!showReservationModal) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setShowReservationModal(false);
+      }
+      if (event.key === "Tab") {
+        const focusable = dialogRef.current?.querySelectorAll(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled])'
+        );
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (document.activeElement === dialogRef.current) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      (triggerRef.current || previousFocus)?.focus?.();
+    };
+  }, [showReservationModal]);
+
+  const allRegions = useMemo(() => [...new Set(stores.map((store) => store.region).filter(Boolean))], [stores]);
+  const foodThemes = useMemo(() => [...new Set(stores.map((store) => store.theme).filter(Boolean))], [stores]);
   const regionSuggestions = useMemo(() => {
     const query = regionQuery.trim().toLowerCase();
     if (!query) {
       return allRegions.slice(0, 6);
     }
     return allRegions.filter((region) => region.toLowerCase().includes(query)).slice(0, 6);
-  }, [regionQuery]);
+  }, [allRegions, regionQuery]);
 
   const visibleStores = useMemo(() => {
-    if (!selectedRegion || selectedFilters.length === 0) {
-      return [];
+    let result = stores.filter((store) => !selectedRegion || store.region === selectedRegion);
+
+    if (!selectedRegion && regionQuery.trim()) {
+      const query = regionQuery.trim().toLowerCase();
+      result = result.filter((store) => `${store.region} ${store.address}`.toLowerCase().includes(query));
     }
 
-    let result = stores.filter((store) => store.region === selectedRegion);
+    if (selectedTheme) {
+      result = result.filter((store) => store.theme === selectedTheme);
+    }
+
+    if (selectedPrice) {
+      const range = priceRanges.find((item) => item.key === selectedPrice);
+      result = result.filter((store) => store.averagePrice != null && store.averagePrice >= range.min && store.averagePrice < range.max);
+    }
 
     if (selectedFilters.includes("available-now")) {
       result = result.filter((store) => store.availableNow);
     }
 
-    if (selectedFilters.includes("date")) {
-      result = result.filter((store) => store.vibeTags.includes("데이트"));
-    }
-
-    if (selectedFilters.includes("group")) {
-      result = result.filter((store) => store.vibeTags.includes("모임"));
-    }
-
-    if (selectedFilters.includes("top-rated")) {
-      result = [...result].sort((a, b) => b.rating - a.rating);
-    }
+    if (sortBy === "price-low") result = [...result].sort((a, b) => (a.averagePrice ?? Infinity) - (b.averagePrice ?? Infinity));
+    if (sortBy === "price-high") result = [...result].sort((a, b) => (b.averagePrice ?? -1) - (a.averagePrice ?? -1));
 
     return result;
-  }, [selectedFilters, selectedRegion]);
+  }, [stores, regionQuery, selectedFilters, selectedPrice, selectedRegion, selectedTheme, sortBy]);
 
-  useEffect(() => {
-    if (!visibleStores.length) {
-      setSelectedStoreId("");
-      setSelectedTime("");
-      return;
-    }
-
-    const stillVisible = visibleStores.find((store) => store.id === selectedStoreId);
-    const nextStore = stillVisible ?? visibleStores[0];
-    setSelectedStoreId(nextStore.id);
-    setSelectedTime((prev) =>
-      prev && nextStore.reservationTimes.includes(prev) ? prev : nextStore.reservationTimes[0]
-    );
-  }, [selectedStoreId, visibleStores]);
-
-  const selectedStore =
-    visibleStores.find((store) => store.id === selectedStoreId) ?? null;
+  const selectedStore = stores.find((store) => store.id === selectedStoreId) ?? null;
 
   const toggleFilter = (key) => {
     setSelectedFilters((prev) => {
@@ -185,60 +304,71 @@ export default function App() {
   const handleResetRegion = () => {
     setRegionQuery("");
     setSelectedRegion("");
-    setSelectedFilters([]);
-    setSelectedStoreId("");
-    setSelectedTime("");
-    setSelectedPartySize(2);
   };
 
   const handleResetFilters = () => {
+    setSelectedRegion("");
+    setRegionQuery("");
+    setSelectedTheme("");
+    setSelectedPrice("");
     setSelectedFilters([]);
-    setSelectedStoreId("");
-    setSelectedTime("");
   };
 
-  const handleSelectStore = (store) => {
+  const handleSelectStore = (store, trigger) => {
+    triggerRef.current = trigger;
+    if (store.id !== selectedStoreId) {
+      setRequestNote("");
+      setSelectedPartySize(null);
+      setSelectedTime("");
+    }
     setSelectedStoreId(store.id);
-    setSelectedTime(store.reservationTimes[0]);
+    setShowReservationModal(true);
   };
 
-  const hasSelectedRegion = Boolean(selectedRegion);
-  const hasSelectedFilters = selectedFilters.length > 0;
+  const handleSelectPartySize = (size) => {
+    if (size !== selectedPartySize) setSelectedTime("");
+    setSelectedPartySize(size);
+  };
+
   const hasVisibleStores = visibleStores.length > 0;
+
+  const handleReservationPreview = () => {
+    if (!selectedStore || !selectedPartySize || !selectedDate || timesLoading || timesError || !availableTimes.includes(selectedTime)) return;
+    window.sessionStorage.setItem(
+      "matgourmand-reservation-draft",
+      JSON.stringify({
+        storeId: selectedStore.id,
+        storeName: selectedStore.name,
+        region: selectedStore.region,
+        theme: selectedStore.theme,
+        date: selectedDate,
+        time: selectedTime,
+        partySize: selectedPartySize,
+        requestNote: requestNote.trim()
+      })
+    );
+    navigate("/reservations/preview");
+  };
 
   return (
     <div className="min-h-screen bg-white text-stone-900">
       <div className="mx-auto max-w-7xl px-4 pb-14 pt-5 sm:px-6 lg:px-8">
-        <header className="flex items-center justify-between rounded-3xl border border-stone-100 bg-white px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.05)] sm:px-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#dd6b6b] font-['Cormorant_Garamond'] text-2xl font-semibold text-white">
-              M
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-tight">MatGourmand</p>
-              <p className="text-xs text-stone-500">지역 검색부터 시작하는 예약 MVP</p>
-            </div>
-          </div>
+        {header}
 
-          <button className="rounded-full bg-[#fbe7e5] px-4 py-2 text-sm font-semibold text-[#bf4f4f]">
-            로그인
-          </button>
-        </header>
-
-        <main className="mt-5 grid gap-5 lg:grid-cols-[1.45fr_0.85fr]">
+        <main className="mt-5 space-y-5">
           <section className="space-y-5">
             <section className="rounded-[2rem] border border-[#f0dfcf] bg-[linear-gradient(135deg,#fff8ef_0%,#f8e4cd_100%)] p-5 shadow-[0_24px_60px_rgba(122,73,34,0.08)] sm:p-7">
-              <p className="text-sm font-semibold text-stone-900">오늘 갈 지역부터 고르기</p>
+              <p className="text-sm font-semibold text-stone-900">오늘의 식당 찾기</p>
               <h1 className="mt-3 font-['Cormorant_Garamond'] text-4xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-5xl">
-                지역 찾고,
+                지역을 고르고,
                 <br />
-                필터로 좁히고,
+                취향을 더하고,
                 <br />
-                바로 예약까지.
+                예산에 맞게.
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-600 sm:text-base">
-                지역을 먼저 검색해서 선택한 뒤, 평점이나 지금 예약 가능 여부로 빠르게
-                걸러보고 원하는 가게를 예약하는 흐름의 메인 화면입니다.
+                가고 싶은 동네, 먹고 싶은 음식, 생각한 가격대를 자유롭게 골라보세요.
+                조건에 맞는 식당을 바로 살펴볼 수 있습니다.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-2">
@@ -255,35 +385,49 @@ export default function App() {
 
             <section className="rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-6">
               <div>
-                <p className="text-lg font-semibold text-stone-900">1. 지역 선택</p>
+                <p className="text-lg font-semibold text-stone-900">나에게 맞는 식당 찾기</p>
                 <p className="text-sm text-stone-500">
-                  지역을 검색하면 자동완성처럼 후보가 나오고, 선택 후 필터를 고를 수 있어요
+                  지역·음식 테마·가격대는 각각 선택할 수 있어요.
                 </p>
               </div>
 
               <div className="mt-5">
-                <p className="mb-2 text-sm font-medium text-stone-700">지역 검색</p>
+                <label htmlFor="region-search" className="mb-2 block text-sm font-semibold text-stone-700">지역</label>
                 <div className="flex items-center gap-3 rounded-[1.4rem] border border-stone-200 bg-white px-4 py-3 shadow-sm">
                   <input
+                    id="region-search"
                     value={regionQuery}
-                    onChange={(event) => setRegionQuery(event.target.value)}
+                    onChange={(event) => {
+                      setRegionQuery(event.target.value);
+                      setSelectedRegion("");
+                    }}
                     placeholder="예: 성수, 한남, 연남"
-                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-medium text-stone-900 outline-none placeholder:text-stone-400"
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-medium text-stone-900 outline-none placeholder:text-stone-400 focus-visible:ring-2 focus-visible:ring-[#dd6b6b]"
                   />
                   <button
                     type="button"
                     onClick={handleResetRegion}
                     className="shrink-0 rounded-full bg-[#fff1ef] px-3 py-1.5 text-xs font-semibold text-[#bf4f4f] transition hover:bg-[#ffe4e1]"
                   >
-                    초기화
+                    지우기
                   </button>
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetRegion}
+                    aria-pressed={!selectedRegion}
+                    className={`rounded-full px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${!selectedRegion ? "bg-[#dd6b6b] text-white" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}
+                  >
+                    전체 지역
+                  </button>
                   {regionSuggestions.map((region) => (
                     <button
                       key={region}
+                      type="button"
                       onClick={() => handleSelectRegion(region)}
+                      aria-pressed={selectedRegion === region}
                       className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                         selectedRegion === region
                           ? "bg-[#dd6b6b] text-white"
@@ -296,82 +440,95 @@ export default function App() {
                 </div>
               </div>
 
-              {selectedRegion ? (
-                <div className="fade-slide-up mt-6 border-t border-stone-100 pt-5">
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
-                      <p className="text-lg font-semibold text-stone-900">2. 필터 선택</p>
-                      <p className="text-sm text-stone-500">
-                        선택한 지역 안에서 필요한 조건으로 바로 좁혀보세요
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-[#fff1ef] px-3 py-1 text-xs font-semibold text-[#bf4f4f]">
-                        선택 지역: {selectedRegion}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleResetFilters}
-                        className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-semibold text-stone-600 transition hover:bg-[#f3e7d8]"
-                      >
-                        필터 초기화
+              <div className="mt-6 border-t border-stone-100 pt-5">
+                <p className="text-sm font-semibold text-stone-700">음식 테마</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {["전체", ...foodThemes].map((theme) => {
+                    const value = theme === "전체" ? "" : theme;
+                    const active = selectedTheme === value;
+                    return (
+                      <button key={theme} type="button" onClick={() => setSelectedTheme(value)} aria-pressed={active} className={`rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${active ? "bg-[#dd6b6b] text-white" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}>
+                        {theme}
                       </button>
-                    </div>
-                  </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-6 border-t border-stone-100 pt-5">
+                <p className="text-sm font-semibold text-stone-700">1인 예상 가격대</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[{ key: "", label: "전체 가격" }, ...priceRanges].map((range) => {
+                    const active = selectedPrice === range.key;
+                    return (
+                      <button key={range.key || "all"} type="button" onClick={() => setSelectedPrice(range.key)} aria-pressed={active} className={`rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${active ? "bg-[#dd6b6b] text-white" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}>
+                        {range.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-stone-100 pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-stone-700">추가 조건</p>
+                  <button type="button" onClick={handleResetFilters} className="rounded-full bg-[#fff1ef] px-3 py-1.5 text-xs font-semibold text-[#a94444] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">전체 초기화</button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {filters.map((filter) => {
                     const active = selectedFilters.includes(filter.key);
-                      return (
-                        <button
-                          key={filter.key}
-                          onClick={() => toggleFilter(filter.key)}
-                          className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                            active
-                              ? "bg-[#fff1ef] text-[#bf4f4f] ring-1 ring-[#f1b5b0]"
-                              : "bg-white text-stone-600 hover:bg-[#f6eee4]"
-                          }`}
-                        >
-                          {filter.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                    return (
+                      <button key={filter.key} type="button" onClick={() => toggleFilter(filter.key)} aria-pressed={active} className={`rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${active ? "bg-[#fff1ef] text-[#a94444] ring-1 ring-[#eab0aa]" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}>
+                        {filter.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : null}
+              </div>
             </section>
 
             <section className="rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-6">
-              <div className="flex items-end justify-between gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-stone-900">3. 가게 리스트</p>
+                  <p className="text-lg font-semibold text-stone-900">조건에 맞는 식당</p>
                   <p className="text-sm text-stone-500">
-                    썸네일, 가게명, 평점, 예약 가능 여부만 먼저 빠르게 확인합니다
+                    식당을 누르면 예약 창이 열립니다. 상세 정보도 확인해 보세요.
                   </p>
                 </div>
-                <p className="text-sm font-medium text-stone-500">
-                  {hasSelectedRegion && hasSelectedFilters
-                    ? `${visibleStores.length}개 결과`
-                    : selectedRegion
-                      ? "필터를 먼저 선택해 주세요"
-                      : "지역을 먼저 선택해 주세요"}
-                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <p aria-live="polite" className="text-sm font-medium text-stone-500">
+                    {visibleStores.length}개 결과
+                  </p>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+                    정렬
+                    <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">
+                      {sortOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </label>
+                </div>
               </div>
 
-              {hasSelectedRegion && hasSelectedFilters && hasVisibleStores ? (
-                <div className="fade-slide-up mt-5 grid gap-4 md:grid-cols-2">
+              {loading ? (
+                <p role="status" className="mt-5 rounded-[1.6rem] bg-[#fbf6f0] px-5 py-8 text-center text-sm text-stone-600">식당을 불러오는 중입니다...</p>
+              ) : error ? (
+                <div role="alert" className="mt-5 rounded-[1.6rem] bg-[#fbf6f0] px-5 py-8 text-center text-sm text-stone-700">
+                  <p>{error}</p>
+                  <button type="button" onClick={retry} className="mt-4 rounded-full bg-[#dd6b6b] px-5 py-2.5 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">다시 시도</button>
+                </div>
+              ) : hasVisibleStores ? (
+                <div className="fade-slide-up mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {visibleStores.map((store) => {
-                    const active = selectedStore?.id === store.id;
                     return (
-                      <button
+                      <div
                         key={store.id}
-                        onClick={() => handleSelectStore(store)}
-                        className={`rounded-[1.6rem] border p-4 text-left transition ${
-                          active
-                            ? "border-[#eab0aa] bg-[#fff7f6] shadow-[0_16px_40px_rgba(191,79,79,0.10)]"
-                            : "border-stone-100 bg-white hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
-                        }`}
+                        className="rounded-[1.6rem] border border-stone-100 bg-white p-4 text-left transition hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
                       >
+                        <button
+                          type="button"
+                          onClick={(event) => handleSelectStore(store, event.currentTarget)}
+                          aria-label={`${store.name} 예약 창 열기`}
+                          className="block w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]"
+                        >
                         <div className={`h-36 rounded-[1.2rem] ${store.thumbnail}`} />
                         <div className="mt-4">
                           <div className="flex items-start justify-between gap-3">
@@ -381,42 +538,55 @@ export default function App() {
                               </h3>
                               <p className="mt-1 text-sm text-stone-500">{store.summary}</p>
                             </div>
-                            <span className="rounded-full bg-[#fff1ef] px-3 py-1 text-xs font-semibold text-[#bf4f4f]">
-                              ★ {store.rating.toFixed(1)}
-                            </span>
+                            {store.theme && <span className="rounded-full bg-[#fff1ef] px-3 py-1 text-xs font-semibold text-[#bf4f4f]">{store.theme}</span>}
                           </div>
 
-                          <div className="mt-3 flex items-center justify-between text-sm">
-                            <span className="text-stone-500">리뷰 {store.reviewCount}개</span>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                            <span className="text-stone-500">{store.region || store.address}{store.averagePrice != null ? ` · 약 ${store.averagePrice.toLocaleString("ko-KR")}원/인` : ""}</span>
                             <span
                               className={`font-semibold ${
                                 store.availableNow ? "text-[#bf4f4f]" : "text-stone-400"
                               }`}
                             >
-                              {store.availableNow ? "지금 예약 가능" : "조금 뒤 예약 가능"}
+                              {store.availableNow ? "예약 접수 중" : "예약 접수 중지"}
                             </span>
                           </div>
                         </div>
-                      </button>
+                        <span className="mt-4 inline-block text-sm font-semibold text-[#a94444]">예약하기 →</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/stores/${store.id}`)}
+                          className="mt-4 rounded-lg text-sm font-semibold text-[#a94444] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]"
+                        >
+                          상세 보기 →
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
               ) : (
                 <div className="mt-5 rounded-[1.6rem] bg-[#fbf6f0] px-5 py-8 text-center text-sm text-stone-500">
-                  {!selectedRegion
-                    ? "지역을 검색해서 선택하면 해당 지역 가게 리스트가 여기 표시됩니다."
-                    : selectedFilters.length === 0
-                      ? "필터를 하나 이상 고르면 해당 지역 가게 리스트가 여기 표시됩니다."
-                      : "현재 선택한 조건으로는 찾을 수 있는 가게가 없어요. 필터를 바꾸거나 초기화해 보세요."}
+                  {stores.length === 0 ? "등록된 식당이 아직 없어요." : "현재 선택한 조건에 맞는 식당이 없어요. 조건을 바꾸거나 초기화해 보세요."}
                 </div>
               )}
             </section>
           </section>
 
-          <aside className="rounded-[2rem] bg-[#f7f1e8] p-4 sm:p-5">
-            {selectedStore ? (
-              <div className="space-y-5">
-                <section className="rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
+          {showReservationModal && selectedStore && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+              <button type="button" aria-label="예약 창 닫기" onClick={() => setShowReservationModal(false)} className="absolute inset-0 bg-stone-950/60" />
+              <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="reservation-dialog-title" tabIndex={-1} className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-[#f7f1e8] p-4 shadow-[0_30px_100px_rgba(28,20,16,0.35)] outline-none sm:max-h-[calc(100dvh-3rem)] sm:p-6">
+                <div className="mb-5 flex items-start justify-between gap-4 px-1">
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.14em] text-[#a94444]">RESERVATION</p>
+                    <h2 id="reservation-dialog-title" className="mt-1 text-2xl font-semibold text-stone-900">{selectedStore.name} 예약하기</h2>
+                    <p className="mt-1 text-sm text-stone-600">날짜와 인원수를 고른 뒤 시간대를 선택해 보세요.</p>
+                  </div>
+                  <button type="button" onClick={() => setShowReservationModal(false)} aria-label="예약 창 닫기" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl text-stone-700 hover:bg-[#fff1ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">×</button>
+                </div>
+                <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+                <section className="order-2 rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:order-1">
                   <p className="text-sm font-semibold text-stone-900">선택한 가게</p>
                   <div className={`mt-4 h-44 rounded-[1.4rem] ${selectedStore.thumbnail}`} />
                   <h2 className="mt-4 text-2xl font-semibold text-stone-900">
@@ -426,46 +596,21 @@ export default function App() {
                     {selectedStore.summary}
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-[#fff1ef] px-3 py-1 text-xs font-semibold text-[#bf4f4f]">
-                      ★ {selectedStore.rating.toFixed(1)}
-                    </span>
-                    <span className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600">
-                      {selectedStore.region}
-                    </span>
-                    {selectedStore.vibeTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                    {selectedStore.region && <span className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600">{selectedStore.region}</span>}
+                    {selectedStore.theme && <span className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600">{selectedStore.theme}</span>}
+                    <span className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600">{selectedStore.address}</span>
                   </div>
                 </section>
 
-                <section className="rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
-                  <p className="text-lg font-semibold text-stone-900">4. 예약 신청</p>
+                <section className="order-1 rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:order-2">
+                  <p className="text-lg font-semibold text-stone-900">예약 내용 선택</p>
                   <p className="mt-1 text-sm text-stone-500">
-                    시간대와 인원수만 고르면 바로 예약 신청하는 MVP 흐름입니다
+                    날짜와 인원수를 고른 뒤 시간대를 선택해 보세요.
                   </p>
 
                   <div className="mt-5">
-                    <p className="text-sm font-medium text-stone-700">예약 시간대</p>
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      {selectedStore.reservationTimes.map((time) => (
-                        <button
-                          key={time}
-                          onClick={() => setSelectedTime(time)}
-                          className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                            selectedTime === time
-                              ? "bg-[#dd6b6b] text-white"
-                              : "bg-[#fff1ef] text-[#bf4f4f] hover:bg-[#ffe4e1]"
-                          }`}
-                        >
-                          {time}
-                        </button>
-                      ))}
-                    </div>
+                    <label htmlFor="reservation-date" className="text-sm font-medium text-stone-700">예약 날짜</label>
+                    <input id="reservation-date" type="date" min={tomorrowDate()} value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); setSelectedTime(""); }} className="mt-3 block w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]" />
                   </div>
 
                   <div className="mt-5">
@@ -473,8 +618,10 @@ export default function App() {
                     <div className="mt-3 grid grid-cols-3 gap-3">
                       {partySizes.map((size) => (
                         <button
+                          type="button"
                           key={size}
-                          onClick={() => setSelectedPartySize(size)}
+                          onClick={() => handleSelectPartySize(size)}
+                          aria-pressed={selectedPartySize === size}
                           className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                             selectedPartySize === size
                               ? "bg-[#dd6b6b] text-white"
@@ -487,28 +634,48 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="mt-5">
+                    <label htmlFor="reservation-time" className="text-sm font-medium text-stone-700">예약 시간대</label>
+                    <select
+                      id="reservation-time"
+                      value={selectedTime}
+                      onChange={(event) => setSelectedTime(event.target.value)}
+                      disabled={!selectedPartySize || timesLoading || Boolean(timesError) || availableTimes.length === 0}
+                      className="mt-3 block w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-500"
+                    >
+                      <option value="" disabled>
+                        {!selectedPartySize ? "먼저 인원수를 선택하세요" : timesLoading ? "시간대를 확인하는 중입니다" : timesError ? "시간대를 불러오지 못했어요" : availableTimes.length ? "시간대를 선택하세요" : "선택 가능한 시간대가 없습니다"}
+                      </option>
+                      {availableTimes.map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                    {timesError && <div role="alert" className="mt-2 flex items-center gap-3 text-xs text-[#a94444]"><span>{timesError}</span><button type="button" onClick={() => setTimesReloadKey((key) => key + 1)} className="font-semibold underline">다시 시도</button></div>}
+                    {selectedPartySize && !timesLoading && !timesError && <p className="mt-2 text-xs text-stone-500">영업시간과 잔여석을 기준으로 표시합니다. 예약 접수 시 다시 확인합니다.</p>}
+                  </div>
+
+                  <div className="mt-5">
+                    <label htmlFor="reservation-note" className="text-sm font-medium text-stone-700">요청 사항 <span className="font-normal text-stone-400">(선택)</span></label>
+                    <textarea id="reservation-note" maxLength={500} rows={3} value={requestNote} onChange={(event) => setRequestNote(event.target.value)} placeholder="예: 조용한 자리 부탁드립니다" className="mt-3 block w-full resize-none rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]" />
+                  </div>
+
                   <div className="mt-6 rounded-[1.4rem] bg-[#fbf6f0] p-4">
                     <p className="text-sm text-stone-500">예약 요약</p>
                     <p className="mt-2 font-semibold text-stone-900">{selectedStore.name}</p>
                     <p className="mt-1 text-sm text-stone-600">
-                      {selectedStore.region} · {selectedTime} · {selectedPartySize}명
+                      {selectedStore.region} · {selectedDate || "날짜 미선택"} · {selectedPartySize ? `${selectedPartySize}명` : "인원 미선택"} · {selectedTime || "시간 미선택"}
                     </p>
                   </div>
 
-                  <button className="mt-5 w-full rounded-full bg-[#dd6b6b] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#d15c5c]">
-                    예약 신청하기
+                  <button type="button" onClick={handleReservationPreview} disabled={!selectedDate || !selectedPartySize || timesLoading || Boolean(timesError) || !availableTimes.includes(selectedTime)} className="mt-5 w-full rounded-full bg-[#dd6b6b] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#d15c5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600">
+                    예약 내용 확인
                   </button>
+                  <p className="mt-3 text-center text-xs leading-5 text-stone-500">다음 화면에서 내용을 확인한 뒤 예약을 접수할 수 있습니다.</p>
                 </section>
-              </div>
-            ) : (
-              <section className="rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
-                <p className="text-lg font-semibold text-stone-900">가게를 선택해 주세요</p>
-                <p className="mt-2 text-sm text-stone-500">
-                  지역을 먼저 선택한 뒤 왼쪽 리스트에서 가게를 누르면 예약 패널이 열립니다.
-                </p>
+                </div>
               </section>
-            )}
-          </aside>
+            </div>
+          )}
         </main>
       </div>
     </div>

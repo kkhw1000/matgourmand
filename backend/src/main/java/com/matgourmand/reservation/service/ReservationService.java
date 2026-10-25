@@ -8,17 +8,21 @@ import com.matgourmand.common.exception.ErrorCode;
 import com.matgourmand.common.exception.ForbiddenException;
 import com.matgourmand.common.exception.ResourceNotFoundException;
 import com.matgourmand.reservation.domain.Reservation;
+import com.matgourmand.reservation.domain.ReservationStatus;
 import com.matgourmand.reservation.dto.ReservationCreateRequest;
 import com.matgourmand.reservation.dto.ReservationResponse;
 import com.matgourmand.reservation.repository.ReservationRepository;
 import com.matgourmand.store.domain.Store;
+import com.matgourmand.store.domain.StoreStatus;
 import com.matgourmand.store.repository.StoreRepository;
 import com.matgourmand.user.domain.User;
 import com.matgourmand.user.domain.UserRole;
 import com.matgourmand.user.repository.UserRepository;
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,9 +42,14 @@ public class ReservationService {
     public ReservationResponse createReservation(AuthenticatedUser authenticatedUser, ReservationCreateRequest request) {
         validateCustomerRole(authenticatedUser);
 
-        Store store = getStoreEntity(request.storeId());
+        Store store = storeRepository.findByIdForUpdate(request.storeId())
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.STORE_NOT_FOUND));
         User customer = getCustomerEntity(authenticatedUser.id());
         validateReservationTime(store.getId(), request.reservationTime());
+        if (!availableTimes(store, request.reservationTime().toLocalDate(), request.partySize())
+                .contains(request.reservationTime().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")))) {
+            throw new BadRequestException(ErrorCode.RESERVATION_SLOT_FULL);
+        }
 
         Reservation reservation = Reservation.create(
                 store,
@@ -67,29 +76,58 @@ public class ReservationService {
                 .toList();
     }
 
+    public List<ReservationResponse> getMyReservations(AuthenticatedUser authenticatedUser) {
+        validateCustomerRole(authenticatedUser);
+        return reservationRepository.findAllByCustomerIdOrderByReservationTimeDesc(authenticatedUser.id()).stream()
+                .map(ReservationResponse::from)
+                .toList();
+    }
+
+    public List<String> getAvailableTimes(Long storeId, LocalDate date, int partySize) {
+        return availableTimes(getStoreEntity(storeId), date, partySize);
+    }
+
+    private List<String> availableTimes(Store store, LocalDate date, int partySize) {
+        if (date == null || partySize < 1 || partySize > store.getCapacityPerSlot()
+                || store.getStatus() != StoreStatus.OPEN) return List.of();
+        BusinessHour hours = businessHourRepository.findByStoreIdAndDayOfWeek(store.getId(), date.getDayOfWeek())
+                .orElse(null);
+        if (hours == null || hours.isClosed()) return List.of();
+
+        List<Reservation> reservations = reservationRepository.findAllByStoreIdAndReservationTimeBetween(
+                store.getId(), date.atStartOfDay(), date.plusDays(1).atStartOfDay());
+        List<String> times = new ArrayList<>();
+        for (LocalTime time = hours.getOpenTime(); time.isBefore(hours.getCloseTime()); time = time.plusMinutes(30)) {
+            LocalDateTime slot = date.atTime(time);
+            if (!slot.isAfter(LocalDateTime.now())) continue;
+            LocalDateTime candidate = slot;
+            int bookedGuests = reservations.stream()
+                    .filter(reservation -> reservation.getStatus() != ReservationStatus.CANCELED)
+                    .filter(reservation -> reservation.getReservationTime().equals(candidate))
+                    .mapToInt(Reservation::getPartySize)
+                    .sum();
+            if (bookedGuests + partySize <= store.getCapacityPerSlot()) {
+                times.add(time.format(DateTimeFormatter.ofPattern("HH:mm")));
+            }
+        }
+        return times;
+    }
+
+    private void validateReservationTime(Long storeId, LocalDateTime reservationTime) {
+        BusinessHour hours = businessHourRepository.findByStoreIdAndDayOfWeek(storeId, reservationTime.getDayOfWeek())
+                .orElseThrow(() -> new BadRequestException(ErrorCode.RESERVATION_TIME_NOT_AVAILABLE));
+        LocalTime time = reservationTime.toLocalTime();
+        if (hours.isClosed() || time.isBefore(hours.getOpenTime()) || !time.isBefore(hours.getCloseTime())) {
+            throw new BadRequestException(ErrorCode.RESERVATION_TIME_NOT_AVAILABLE);
+        }
+    }
+
     @Transactional
     public ReservationResponse cancelReservation(AuthenticatedUser authenticatedUser, Long reservationId) {
         Reservation reservation = getReservationEntity(reservationId);
         validateReservationCustomer(authenticatedUser, reservation);
         reservation.cancel();
         return ReservationResponse.from(reservation);
-    }
-
-    private void validateReservationTime(Long storeId, LocalDateTime reservationTime) {
-        DayOfWeek dayOfWeek = reservationTime.getDayOfWeek();
-        LocalTime reservationLocalTime = reservationTime.toLocalTime();
-
-        BusinessHour businessHour = businessHourRepository.findByStoreIdAndDayOfWeek(storeId, dayOfWeek)
-                .orElseThrow(() -> new BadRequestException(ErrorCode.RESERVATION_TIME_NOT_AVAILABLE));
-
-        if (businessHour.isClosed()) {
-            throw new BadRequestException(ErrorCode.RESERVATION_TIME_NOT_AVAILABLE);
-        }
-
-        if (reservationLocalTime.isBefore(businessHour.getOpenTime())
-                || !reservationLocalTime.isBefore(businessHour.getCloseTime())) {
-            throw new BadRequestException(ErrorCode.RESERVATION_TIME_NOT_AVAILABLE);
-        }
     }
 
     private Store getStoreEntity(Long storeId) {

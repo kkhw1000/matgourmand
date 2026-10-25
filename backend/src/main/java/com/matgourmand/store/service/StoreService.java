@@ -36,7 +36,8 @@ public class StoreService {
                         ErrorCode.OWNER_NOT_FOUND.getMessage() + " id=" + authenticatedUser.id()
                 ));
 
-        Store store = Store.create(owner, request.name(), request.address(), request.phone(), request.description());
+        Store store = Store.create(owner, request.name(), request.address(), request.phone(), request.description(),
+                request.region(), request.theme(), request.averagePrice(), request.capacityPerSlot());
         return StoreResponse.from(storeRepository.save(store));
     }
 
@@ -59,6 +60,12 @@ public class StoreService {
         Store store = getStoreEntity(storeId);
         validateStoreOwner(authenticatedUser, store);
         store.updateStoreInfo(request.name(), request.address(), request.phone(), request.description());
+        store.updateDiscoveryInfo(
+                request.region() != null ? request.region() : store.getRegion(),
+                request.theme() != null ? request.theme() : store.getTheme(),
+                request.averagePrice() != null ? request.averagePrice() : store.getAveragePrice(),
+                request.capacityPerSlot()
+        );
         return StoreResponse.from(store);
     }
 

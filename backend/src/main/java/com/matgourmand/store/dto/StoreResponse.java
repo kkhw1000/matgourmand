@@ -12,6 +12,10 @@ public record StoreResponse(
         String address,
         String phone,
         String description,
+        String region,
+        String theme,
+        Integer averagePrice,
+        int capacityPerSlot,
         StoreStatus status,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -25,6 +29,10 @@ public record StoreResponse(
                 store.getAddress(),
                 store.getPhone(),
                 store.getDescription(),
+                store.getRegion(),
+                store.getTheme(),
+                store.getAveragePrice(),
+                store.getCapacityPerSlot(),
                 store.getStatus(),
                 store.getCreatedAt(),
                 store.getUpdatedAt()

@@ -1,6 +1,7 @@
 package com.matgourmand.reservation.repository;
 
 import com.matgourmand.reservation.domain.Reservation;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -13,4 +14,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     @EntityGraph(attributePaths = {"store", "customer"})
     List<Reservation> findAllByStoreIdOrderByReservationTimeAsc(Long storeId);
+
+    @EntityGraph(attributePaths = {"store", "customer"})
+    List<Reservation> findAllByCustomerIdOrderByReservationTimeDesc(Long customerId);
+
+    List<Reservation> findAllByStoreIdAndReservationTimeBetween(Long storeId, LocalDateTime start, LocalDateTime end);
 }

@@ -51,7 +51,11 @@ public class StoreController {
                                       "name": "MatGourmand Bistro",
                                       "address": "서울 성수동 123-45",
                                       "phone": "02-123-4567",
-                                      "description": "프렌치 코스와 내추럴 와인을 중심으로 운영하는 예약제 비스트로"
+                                      "description": "프렌치 코스와 내추럴 와인을 중심으로 운영하는 예약제 비스트로",
+                                      "region": "성수",
+                                      "theme": "프렌치",
+                                      "averagePrice": 45000,
+                                      "capacityPerSlot": 12
                                     }
                                     """
                     )

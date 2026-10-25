@@ -50,7 +50,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/stores", "/api/stores/*", "/api/stores/*/business-hours")
+                        .requestMatchers(HttpMethod.GET, "/api/stores", "/api/stores/*", "/api/stores/*/business-hours", "/api/stores/*/available-times")
                         .permitAll()
                         .anyRequest()
                         .authenticated()
