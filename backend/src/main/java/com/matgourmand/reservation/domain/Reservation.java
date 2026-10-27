@@ -83,7 +83,24 @@ public class Reservation extends BaseTimeEntity {
         if (status == ReservationStatus.CANCELED) {
             throw new BadRequestException(ErrorCode.RESERVATION_ALREADY_CANCELED);
         }
+        if (status == ReservationStatus.REJECTED) {
+            throw new BadRequestException(ErrorCode.RESERVATION_STATUS_CHANGE_NOT_ALLOWED);
+        }
         this.status = ReservationStatus.CANCELED;
+    }
+
+    public void confirm() {
+        if (status != ReservationStatus.PENDING) {
+            throw new BadRequestException(ErrorCode.RESERVATION_STATUS_CHANGE_NOT_ALLOWED);
+        }
+        this.status = ReservationStatus.CONFIRMED;
+    }
+
+    public void reject() {
+        if (status != ReservationStatus.PENDING) {
+            throw new BadRequestException(ErrorCode.RESERVATION_STATUS_CHANGE_NOT_ALLOWED);
+        }
+        this.status = ReservationStatus.REJECTED;
     }
 
     private static void validatePartySize(int partySize) {

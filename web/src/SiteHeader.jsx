@@ -22,6 +22,7 @@ export default function SiteHeader({ navigate, session, onLogout }) {
             {session.user?.name}님
           </span>
           {session.user?.role === "CUSTOMER" && <button type="button" onClick={() => navigate("/reservations")} className="rounded-full px-2 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] sm:px-4 sm:text-sm">내 예약</button>}
+          {session.user?.role === "OWNER" && <button type="button" onClick={() => navigate("/owner/reservations")} className="rounded-full px-2 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] sm:px-4 sm:text-sm">예약 관리</button>}
           <button
             type="button"
             onClick={onLogout}

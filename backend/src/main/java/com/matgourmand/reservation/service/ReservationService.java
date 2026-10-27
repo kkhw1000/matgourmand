@@ -102,7 +102,8 @@ public class ReservationService {
             if (!slot.isAfter(LocalDateTime.now())) continue;
             LocalDateTime candidate = slot;
             int bookedGuests = reservations.stream()
-                    .filter(reservation -> reservation.getStatus() != ReservationStatus.CANCELED)
+                    .filter(reservation -> reservation.getStatus() != ReservationStatus.CANCELED
+                            && reservation.getStatus() != ReservationStatus.REJECTED)
                     .filter(reservation -> reservation.getReservationTime().equals(candidate))
                     .mapToInt(Reservation::getPartySize)
                     .sum();
@@ -127,6 +128,22 @@ public class ReservationService {
         Reservation reservation = getReservationEntity(reservationId);
         validateReservationCustomer(authenticatedUser, reservation);
         reservation.cancel();
+        return ReservationResponse.from(reservation);
+    }
+
+    @Transactional
+    public ReservationResponse confirmReservation(AuthenticatedUser authenticatedUser, Long reservationId) {
+        Reservation reservation = getReservationEntity(reservationId);
+        validateStoreOwner(authenticatedUser, reservation.getStore());
+        reservation.confirm();
+        return ReservationResponse.from(reservation);
+    }
+
+    @Transactional
+    public ReservationResponse rejectReservation(AuthenticatedUser authenticatedUser, Long reservationId) {
+        Reservation reservation = getReservationEntity(reservationId);
+        validateStoreOwner(authenticatedUser, reservation.getStore());
+        reservation.reject();
         return ReservationResponse.from(reservation);
     }
 

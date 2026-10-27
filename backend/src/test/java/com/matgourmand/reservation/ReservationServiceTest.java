@@ -169,6 +169,46 @@ class ReservationServiceTest {
                 .allMatch(reservation -> reservation.customerId().equals(customer.getId()));
     }
 
+    @Test
+    void onlyStoreOwnerCanConfirmPendingReservation() {
+        User owner = userRepository.save(User.createOwner("confirm-owner@test.com", "encoded-password", "Owner", null));
+        User anotherOwner = userRepository.save(User.createOwner("confirm-other@test.com", "encoded-password", "Other", null));
+        User customer = userRepository.save(User.createCustomer("confirm-customer@test.com", "encoded-password", "Customer", null));
+        Store store = storeRepository.save(Store.create(owner, "Store", "Seoul", null, null));
+        Reservation reservation = reservationRepository.save(Reservation.create(store, customer,
+                LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atTime(18, 0), 2, null));
+
+        assertThatThrownBy(() -> reservationService.confirmReservation(authenticatedUser(anotherOwner), reservation.getId()))
+                .isInstanceOf(ForbiddenException.class);
+        assertThat(reservationService.confirmReservation(authenticatedUser(owner), reservation.getId()).status())
+                .isEqualTo(ReservationStatus.CONFIRMED);
+        assertThatThrownBy(() -> reservationService.rejectReservation(authenticatedUser(owner), reservation.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RESERVATION_STATUS_CHANGE_NOT_ALLOWED);
+    }
+
+    @Test
+    void rejectedReservationReleasesItsTimeSlot() {
+        User owner = userRepository.save(User.createOwner("reject-owner@test.com", "encoded-password", "Owner", null));
+        User customer = userRepository.save(User.createCustomer("reject-customer@test.com", "encoded-password", "Customer", null));
+        Store store = storeRepository.save(Store.create(owner, "Store", "Seoul", null, null,
+                "성수", "프렌치", 40000, 2));
+        businessHourRepository.save(BusinessHour.create(store, DayOfWeek.MONDAY,
+                LocalTime.of(18, 0), LocalTime.of(19, 0), false));
+        LocalDate date = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+        Reservation reservation = reservationRepository.save(Reservation.create(store, customer, date.atTime(18, 0), 2, null));
+
+        assertThat(reservationService.getAvailableTimes(store.getId(), date, 2)).doesNotContain("18:00");
+        assertThat(reservationService.rejectReservation(authenticatedUser(owner), reservation.getId()).status())
+                .isEqualTo(ReservationStatus.REJECTED);
+        assertThat(reservationService.getAvailableTimes(store.getId(), date, 2)).contains("18:00");
+        assertThatThrownBy(() -> reservationService.cancelReservation(authenticatedUser(customer), reservation.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RESERVATION_STATUS_CHANGE_NOT_ALLOWED);
+    }
+
     private AuthenticatedUser authenticatedUser(User user) {
         return new AuthenticatedUser(user.getId(), user.getRole());
     }

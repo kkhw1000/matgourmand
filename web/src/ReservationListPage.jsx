@@ -4,10 +4,11 @@ import { apiRequest, authHeaders } from "./api";
 const tabs = [
   { id: "upcoming", label: "예정" },
   { id: "past", label: "지난 예약" },
-  { id: "canceled", label: "취소" }
+  { id: "canceled", label: "취소" },
+  { id: "rejected", label: "거절" }
 ];
 
-const statusLabels = { PENDING: "신청 접수", CONFIRMED: "예약 확정", CANCELED: "예약 취소" };
+const statusLabels = { PENDING: "신청 접수", CONFIRMED: "예약 확정", CANCELED: "예약 취소", REJECTED: "예약 거절" };
 
 export default function ReservationListPage({ session, navigate, header }) {
   const [reservations, setReservations] = useState([]);
@@ -33,7 +34,8 @@ export default function ReservationListPage({ session, navigate, header }) {
   const now = new Date();
   const visibleReservations = reservations.filter((reservation) => {
     if (tab === "canceled") return reservation.status === "CANCELED";
-    if (reservation.status === "CANCELED") return false;
+    if (tab === "rejected") return reservation.status === "REJECTED";
+    if (reservation.status === "CANCELED" || reservation.status === "REJECTED") return false;
     return tab === "upcoming" ? new Date(reservation.reservationTime) >= now : new Date(reservation.reservationTime) < now;
   });
 
@@ -61,7 +63,7 @@ export default function ReservationListPage({ session, navigate, header }) {
               </div>
               {loading ? <p role="status" className="mt-5 rounded-[2rem] bg-white p-8 text-center text-stone-600">예약을 불러오는 중입니다...</p>
                 : error ? <div role="alert" className="mt-5 rounded-[2rem] bg-white p-8 text-center"><p>{error}</p><button type="button" onClick={() => setReloadKey((key) => key + 1)} className="mt-4 rounded-full bg-[#dd6b6b] px-5 py-2.5 text-sm font-semibold text-white">다시 시도</button></div>
-                  : visibleReservations.length === 0 ? <section className="mt-5 rounded-[2rem] bg-white p-8 text-center"><h2 className="text-lg font-semibold">{tab === "upcoming" ? "예정된 예약이 없어요" : tab === "past" ? "지난 예약이 없어요" : "취소한 예약이 없어요"}</h2><button type="button" onClick={() => navigate("/")} className="mt-5 rounded-full bg-[#fff1ef] px-5 py-2.5 text-sm font-semibold text-[#a94444]">식당 둘러보기</button></section>
+                  : visibleReservations.length === 0 ? <section className="mt-5 rounded-[2rem] bg-white p-8 text-center"><h2 className="text-lg font-semibold">{tab === "upcoming" ? "예정된 예약이 없어요" : tab === "past" ? "지난 예약이 없어요" : tab === "canceled" ? "취소한 예약이 없어요" : "거절된 예약이 없어요"}</h2><button type="button" onClick={() => navigate("/")} className="mt-5 rounded-full bg-[#fff1ef] px-5 py-2.5 text-sm font-semibold text-[#a94444]">식당 둘러보기</button></section>
                     : <div className="mt-5 grid gap-4 sm:grid-cols-2">{visibleReservations.map((reservation) => <article key={reservation.id} className="rounded-[2rem] border border-stone-100 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-semibold text-[#a94444]">예약 #{reservation.id}</p><h2 className="mt-2 text-xl font-semibold">{reservation.storeName}</h2></div><span className="rounded-full bg-[#fff1ef] px-3 py-1.5 text-xs font-semibold text-[#a94444]">{statusLabels[reservation.status] || reservation.status}</span></div><p className="mt-4 text-sm text-stone-600">{new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeStyle: "short" }).format(new Date(reservation.reservationTime))} · {reservation.partySize}명</p><button type="button" onClick={() => navigate(`/reservations/${reservation.id}`)} className="mt-5 rounded-full bg-[#dd6b6b] px-5 py-2.5 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">예약 상세 보기 →</button></article>)}</div>}
             </>
           )}

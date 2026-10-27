@@ -114,4 +114,24 @@ public class ReservationController {
                 reservationService.cancelReservation(authenticatedUser, reservationId)
         ));
     }
+
+    @PutMapping("/api/reservations/{reservationId}/confirm")
+    @Operation(summary = "Confirm reservation", description = "Confirm a pending reservation as the store owner")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ApiResponse<ReservationResponse>> confirmReservation(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long reservationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(reservationService.confirmReservation(authenticatedUser, reservationId)));
+    }
+
+    @PutMapping("/api/reservations/{reservationId}/reject")
+    @Operation(summary = "Reject reservation", description = "Reject a pending reservation as the store owner")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ApiResponse<ReservationResponse>> rejectReservation(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long reservationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(reservationService.rejectReservation(authenticatedUser, reservationId)));
+    }
 }

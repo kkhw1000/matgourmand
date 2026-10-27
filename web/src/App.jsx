@@ -4,6 +4,7 @@ import StoreDetailPage from "./StoreDetailPage";
 import SiteHeader from "./SiteHeader";
 import ReservationPage from "./ReservationPage";
 import ReservationListPage from "./ReservationListPage";
+import OwnerReservationPage from "./OwnerReservationPage";
 import { apiRequest } from "./api";
 import { mapStore } from "./storeData";
 
@@ -133,6 +134,10 @@ export default function App() {
 
   if (route === "/reservations") {
     return <ReservationListPage session={session} navigate={navigate} header={header} />;
+  }
+
+  if (route === "/owner/reservations") {
+    return <OwnerReservationPage session={session} navigate={navigate} header={header} />;
   }
 
   if (route.startsWith("/reservations/")) {

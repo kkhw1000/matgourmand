@@ -4,6 +4,7 @@ import { apiRequest, authHeaders } from "./api";
 const statusLabels = {
   PENDING: "예약 신청 접수",
   CONFIRMED: "예약 확정",
+  REJECTED: "예약 거절",
   CANCELED: "예약 취소"
 };
 
@@ -155,7 +156,7 @@ export default function ReservationPage({ reservationId, isComplete = false, dra
           customerName: reservation.customerName
         }
       : null;
-  const showCompletion = isComplete && reservation?.status !== "CANCELED";
+  const showCompletion = isComplete && reservation?.status !== "CANCELED" && reservation?.status !== "REJECTED";
 
   return (
     <div className="min-h-screen bg-[#fffaf6] text-stone-900">
@@ -198,7 +199,7 @@ export default function ReservationPage({ reservationId, isComplete = false, dra
                     <h2 className="mt-2 text-2xl font-semibold">{details.storeName}</h2>
                     {details.region && <p className="mt-1 text-sm text-stone-500">서울 {details.region} · {details.theme}</p>}
                   </div>
-                  <span className={`rounded-full px-4 py-2 text-sm font-semibold ${reservation?.status === "CANCELED" ? "bg-stone-100 text-stone-600" : "bg-[#fff1ef] text-[#a94444]"}`}>
+                  <span className={`rounded-full px-4 py-2 text-sm font-semibold ${["CANCELED", "REJECTED"].includes(reservation?.status) ? "bg-stone-100 text-stone-600" : "bg-[#fff1ef] text-[#a94444]"}`}>
                     {isPreview ? "아직 접수 전" : statusLabels[reservation.status] || reservation.status}
                   </span>
                 </div>
@@ -226,7 +227,9 @@ export default function ReservationPage({ reservationId, isComplete = false, dra
                         ? "식당에서 예약을 확인하고 있습니다. 상태가 변경되면 이 페이지에서 다시 확인해 주세요."
                         : reservation.status === "CONFIRMED"
                           ? "예약이 확정되었습니다. 방문 일시를 다시 확인해 주세요."
-                          : "취소된 예약입니다."}
+                          : reservation.status === "REJECTED"
+                            ? "식당에서 예약을 거절했습니다. 다른 시간대를 선택해 다시 예약해 주세요."
+                            : "취소된 예약입니다."}
                   </p>
                   {isPreview && (
                     <button type="button" onClick={() => navigate(`/?store=${encodeURIComponent(draft.storeId)}`)} className="mt-6 w-full rounded-full bg-[#dd6b6b] px-5 py-3 text-sm font-semibold text-white hover:bg-[#c85858] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">예약 내용 수정하기</button>
@@ -234,7 +237,7 @@ export default function ReservationPage({ reservationId, isComplete = false, dra
                   {isPreview && <button type="button" onClick={submitReservation} disabled={submitting} className="mt-3 w-full rounded-full bg-stone-900 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] disabled:cursor-wait disabled:opacity-60">{submitting ? "예약을 접수하는 중..." : session ? "예약 신청하기" : "로그인하고 예약 신청하기"}</button>}
                   {submitError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{submitError}</p>}
                   {cancelSuccess && <p role="status" className="mt-4 rounded-xl bg-[#fff1ef] p-3 text-sm text-[#a94444]">예약이 취소되었습니다.</p>}
-                  {!isPreview && reservation?.status !== "CANCELED" && new Date(reservation.reservationTime) > new Date() && <button type="button" onClick={() => { setCancelError(""); setShowCancelDialog(true); }} className="mt-5 w-full rounded-full border border-[#dd6b6b] px-5 py-3 text-sm font-semibold text-[#a94444] hover:bg-[#fff1ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">예약 취소</button>}
+                  {!isPreview && !["CANCELED", "REJECTED"].includes(reservation?.status) && new Date(reservation.reservationTime) > new Date() && <button type="button" onClick={() => { setCancelError(""); setShowCancelDialog(true); }} className="mt-5 w-full rounded-full border border-[#dd6b6b] px-5 py-3 text-sm font-semibold text-[#a94444] hover:bg-[#fff1ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">예약 취소</button>}
                   {!isPreview && <button type="button" onClick={() => navigate("/reservations")} className="mt-3 w-full rounded-full bg-[#fbf6f0] px-5 py-3 text-sm font-semibold text-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">내 예약 목록</button>}
                 </div>
               </aside>

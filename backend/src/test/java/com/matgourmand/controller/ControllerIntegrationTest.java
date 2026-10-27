@@ -4,6 +4,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +12,8 @@ import com.matgourmand.auth.AuthTokenService;
 import com.matgourmand.auth.PasswordHasher;
 import com.matgourmand.businesshour.domain.BusinessHour;
 import com.matgourmand.businesshour.repository.BusinessHourRepository;
+import com.matgourmand.reservation.domain.Reservation;
+import com.matgourmand.reservation.repository.ReservationRepository;
 import com.matgourmand.store.domain.Store;
 import com.matgourmand.store.repository.StoreRepository;
 import com.matgourmand.user.domain.User;
@@ -50,6 +53,9 @@ class ControllerIntegrationTest {
 
     @Autowired
     private BusinessHourRepository businessHourRepository;
+
+    @Autowired
+    private ReservationRepository reservationRepository;
 
     @Autowired
     private FilterChainProxy springSecurityFilterChain;
@@ -206,6 +212,33 @@ class ControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.storeId").value(store.getId()))
                 .andExpect(jsonPath("$.data.customerId").value(customer.getId()))
                 .andExpect(jsonPath("$.data.partySize").value(2));
+    }
+
+    // 점주만 예약을 확정·거절할 수 있고 처리된 예약은 다시 처리할 수 없어야 한다.
+    @Test
+    void ownerCanConfirmOrRejectPendingReservations() throws Exception {
+        User owner = userRepository.save(User.createOwner("decision-owner@test.com", "encoded-password", "Owner", null));
+        User customer = userRepository.save(User.createCustomer("decision-customer@test.com", "encoded-password", "Customer", null));
+        Store store = storeRepository.save(Store.create(owner, "Store", "Seoul", null, null));
+        LocalDate date = LocalDate.now().plusDays(2);
+        Reservation toConfirm = reservationRepository.save(Reservation.create(store, customer, date.atTime(18, 0), 2, null));
+        Reservation toReject = reservationRepository.save(Reservation.create(store, customer, date.atTime(18, 30), 2, null));
+
+        mockMvc.perform(put("/api/reservations/{id}/confirm", toConfirm.getId())
+                        .header(AUTHORIZATION, bearerToken(customer)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/reservations/{id}/confirm", toConfirm.getId())
+                        .header(AUTHORIZATION, bearerToken(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
+        mockMvc.perform(put("/api/reservations/{id}/reject", toConfirm.getId())
+                        .header(AUTHORIZATION, bearerToken(owner)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RESERVATION_STATUS_CHANGE_NOT_ALLOWED"));
+        mockMvc.perform(put("/api/reservations/{id}/reject", toReject.getId())
+                        .header(AUTHORIZATION, bearerToken(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("REJECTED"));
     }
 
     private String bearerToken(User user) {
