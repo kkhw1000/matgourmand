@@ -44,6 +44,15 @@ public class Store extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    private String region;
+
+    private String theme;
+
+    private Integer averagePrice;
+
+    @Column(nullable = false)
+    private int capacityPerSlot = 12;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StoreStatus status;
@@ -67,6 +76,13 @@ public class Store extends BaseTimeEntity {
         return new Store(owner, name, address, phone, description, StoreStatus.OPEN);
     }
 
+    public static Store create(User owner, String name, String address, String phone, String description,
+                               String region, String theme, Integer averagePrice, Integer capacityPerSlot) {
+        Store store = create(owner, name, address, phone, description);
+        store.updateDiscoveryInfo(region, theme, averagePrice, capacityPerSlot);
+        return store;
+    }
+
     public void updateStoreInfo(String name, String address, String phone, String description) {
         if (isBlank(name) || isBlank(address)) {
             throw new BadRequestException(ErrorCode.STORE_NAME_ADDRESS_REQUIRED);
@@ -75,6 +91,16 @@ public class Store extends BaseTimeEntity {
         this.address = address;
         this.phone = phone;
         this.description = description;
+    }
+
+    public void updateDiscoveryInfo(String region, String theme, Integer averagePrice, Integer capacityPerSlot) {
+        if (averagePrice != null && averagePrice < 0 || capacityPerSlot != null && capacityPerSlot < 1) {
+            throw new BadRequestException(ErrorCode.INVALID_REQUEST);
+        }
+        this.region = region;
+        this.theme = theme;
+        this.averagePrice = averagePrice;
+        if (capacityPerSlot != null) this.capacityPerSlot = capacityPerSlot;
     }
 
     public void changeStoreStatus(StoreStatus status) {

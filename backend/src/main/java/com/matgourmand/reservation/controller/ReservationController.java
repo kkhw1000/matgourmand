@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequiredArgsConstructor
@@ -69,6 +72,25 @@ public class ReservationController {
         return ResponseEntity.ok(ApiResponse.ok(reservationService.getReservation(authenticatedUser, reservationId)));
     }
 
+    @GetMapping("/api/reservations/me")
+    @Operation(summary = "Get my reservations")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ApiResponse<List<ReservationResponse>>> getMyReservations(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(reservationService.getMyReservations(authenticatedUser)));
+    }
+
+    @GetMapping("/api/stores/{storeId}/available-times")
+    @Operation(summary = "Get available reservation times")
+    public ResponseEntity<ApiResponse<List<String>>> getAvailableTimes(
+            @PathVariable Long storeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam int partySize
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(reservationService.getAvailableTimes(storeId, date, partySize)));
+    }
+
     @GetMapping("/api/stores/{storeId}/reservations")
     @Operation(summary = "Get store reservations", description = "Retrieve reservations for a store owned by the authenticated OWNER")
     @SecurityRequirement(name = "bearerAuth")
@@ -91,5 +113,25 @@ public class ReservationController {
         return ResponseEntity.ok(ApiResponse.ok(
                 reservationService.cancelReservation(authenticatedUser, reservationId)
         ));
+    }
+
+    @PutMapping("/api/reservations/{reservationId}/confirm")
+    @Operation(summary = "Confirm reservation", description = "Confirm a pending reservation as the store owner")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ApiResponse<ReservationResponse>> confirmReservation(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long reservationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(reservationService.confirmReservation(authenticatedUser, reservationId)));
+    }
+
+    @PutMapping("/api/reservations/{reservationId}/reject")
+    @Operation(summary = "Reject reservation", description = "Reject a pending reservation as the store owner")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ApiResponse<ReservationResponse>> rejectReservation(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long reservationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(reservationService.rejectReservation(authenticatedUser, reservationId)));
     }
 }

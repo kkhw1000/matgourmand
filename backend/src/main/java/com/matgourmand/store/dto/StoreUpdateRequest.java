@@ -8,6 +8,13 @@ public record StoreUpdateRequest(
         @NotBlank(message = "주소는 필수입니다.")
         String address,
         String phone,
-        String description
+        String description,
+        String region,
+        String theme,
+        Integer averagePrice,
+        Integer capacityPerSlot
 ) {
+    public StoreUpdateRequest(String name, String address, String phone, String description) {
+        this(name, address, phone, description, null, null, null, null);
+    }
 }

@@ -1,710 +1,688 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import AuthPage from "./AuthPage";
+import StoreDetailPage from "./StoreDetailPage";
+import SiteHeader from "./SiteHeader";
+import ReservationPage from "./ReservationPage";
+import ReservationListPage from "./ReservationListPage";
+import OwnerReservationPage from "./OwnerReservationPage";
+import { apiRequest } from "./api";
+import { mapStore } from "./storeData";
 
-const quickFilters = ["전체", "데이트", "브런치", "한식", "와인바", "혼밥"];
-
-const categoryItems = [
-  { emoji: "🍝", label: "파스타", route: "#/category/pasta" },
-  { emoji: "🥐", label: "브런치", route: "#/category/brunch" },
-  { emoji: "🥩", label: "스테이크", route: "#/category/steak" },
-  { emoji: "🍷", label: "와인바", route: "#/category/wine" },
-  { emoji: "🍣", label: "일식", route: "#/category/japanese" },
-  { emoji: "☕", label: "카페", route: "#/category/cafe" }
+const priceRanges = [
+  { key: "under-20000", label: "2만원 미만", min: 0, max: 20000 },
+  { key: "20000-39999", label: "2~4만원", min: 20000, max: 40000 },
+  { key: "40000-59999", label: "4~6만원", min: 40000, max: 60000 },
+  { key: "over-60000", label: "6만원 이상", min: 60000, max: Infinity }
 ];
 
-const featuredRestaurants = [
-  {
-    id: "french-dining",
-    badge: "오늘의 추천",
-    name: "한남동 프렌치 다이닝",
-    detail: "조용한 저녁 · 데이트 · 예약 가능",
-    area: "한남동",
-    mood: "차분한 데이트",
-    price: "1인 45,000원대",
-    time: "오늘 19:30 가능"
-  },
-  {
-    id: "brunch-bistro",
-    badge: "지금 인기",
-    name: "성수 브런치 비스트로",
-    detail: "밝은 분위기 · 친구 모임 · 주말 인기",
-    area: "성수동",
-    mood: "가벼운 브런치",
-    price: "1인 22,000원대",
-    time: "오늘 14:00 가능"
-  },
-  {
-    id: "wine-bar",
-    badge: "분위기 맛집",
-    name: "연남동 내추럴 와인 바",
-    detail: "와인바 · 데이트 · 저녁 추천",
-    area: "연남동",
-    mood: "무드 있는 저녁",
-    price: "1인 30,000원대",
-    time: "오늘 20:00 가능"
+const filters = [
+  { key: "available-now", label: "예약 접수 중" }
+];
+
+const sortOptions = [
+  { key: "recommended", label: "추천순" },
+  { key: "price-low", label: "가격 낮은 순" },
+  { key: "price-high", label: "가격 높은 순" }
+];
+
+const partySizes = [1, 2, 3, 4, 5, 6];
+
+const highlightBullets = [
+  "지역별로 발견하기",
+  "음식 취향으로 좁히기",
+  "예산에 맞춰 선택하기"
+];
+
+function tomorrowDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getReservationDraft() {
+  try {
+    return JSON.parse(window.sessionStorage.getItem("matgourmand-reservation-draft"));
+  } catch {
+    return null;
   }
-];
-
-const nearbyPlaces = [
-  {
-    id: "monte-brunch",
-    name: "몽트 브런치",
-    area: "성수동",
-    meta: "브런치 · 도보 12분",
-    slot: "오늘 14:00 가능"
-  },
-  {
-    id: "oak-steak",
-    name: "오크 스테이크 하우스",
-    area: "한남동",
-    meta: "스테이크 · 예약 많음",
-    slot: "오늘 19:30 가능"
-  },
-  {
-    id: "yuja-izakaya",
-    name: "유자 이자카야",
-    area: "연남동",
-    meta: "일식 · 저녁 추천",
-    slot: "오늘 20:00 가능"
-  }
-];
-
-const situationSections = [
-  {
-    title: "데이트할 때",
-    text: "너무 시끄럽지 않고 분위기 좋은 곳 위주로 골랐어요.",
-    route: "#/collection/date",
-    items: [
-      { id: "french-dining", name: "한남동 프렌치 다이닝" },
-      { id: "wine-bar", name: "연남동 와인바" },
-      { id: "small-bistro", name: "서촌 작은 비스트로" }
-    ]
-  },
-  {
-    title: "친구 만날 때",
-    text: "편하게 오래 앉아있기 좋고 메뉴 고르기 쉬운 곳이에요.",
-    route: "#/collection/friends",
-    items: [
-      { id: "brunch-bistro", name: "성수 브런치 비스트로" },
-      { id: "taco-bar", name: "합정 타코 바" },
-      { id: "pub-dining", name: "을지로 펍 다이닝" }
-    ]
-  },
-  {
-    title: "혼자 가볍게",
-    text: "부담 없이 들어가기 좋고 혼밥하기 편한 곳만 모았어요.",
-    route: "#/collection/solo",
-    items: [
-      { id: "ramen", name: "망원 라멘집" },
-      { id: "sandwich", name: "용산 샌드위치 바" },
-      { id: "rice-bowl", name: "서교동 덮밥집" }
-    ]
-  }
-];
-
-const reservationItems = [
-  { name: "르블랑", time: "18:00", seats: "2인 가능" },
-  { name: "모노 키친", time: "18:30", seats: "4인 가능" },
-  { name: "비노테카", time: "20:00", seats: "2인 가능" }
-];
-
-function navigateTo(hash) {
-  window.location.hash = hash;
 }
 
-function getCurrentHash() {
-  return window.location.hash || "#/";
-}
-
-const hoverLiftCard =
-  "transition duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(122,73,34,0.12)]";
-
-const hoverSoftButton =
-  "transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(122,73,34,0.12)]";
-
-function AppShell({ children }) {
-  return (
-    <div className="min-h-screen bg-white text-stone-900">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-8">
-        <header className="flex items-center justify-between rounded-3xl bg-white px-4 py-3 shadow-sm sm:px-5">
-          <button
-            className={`flex items-center gap-3 rounded-2xl px-1 py-1 text-left ${hoverSoftButton}`}
-            onClick={() => navigateTo("#/")}
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#d97745] font-['Cormorant_Garamond'] text-2xl font-semibold text-white">
-              M
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold tracking-tight">MatGourmand</p>
-              <p className="text-xs text-stone-500">오늘 갈 맛집 찾기</p>
-            </div>
-          </button>
-
-          <div className="hidden items-center gap-3 md:flex">
-            <button
-              className={`rounded-full bg-[#f6eee4] px-4 py-2 text-sm font-medium text-stone-600 ${hoverSoftButton}`}
-            >
-              서울
-            </button>
-            <button
-              className={`rounded-full bg-[#d97745] px-4 py-2 text-sm font-semibold text-white ${hoverSoftButton}`}
-              onClick={() => navigateTo("#/login")}
-            >
-              로그인
-            </button>
-          </div>
-        </header>
-
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function HomePage() {
-  return (
-    <main className="mt-5 grid gap-5 lg:grid-cols-[1.5fr_0.9fr]">
-      <section className="space-y-5">
-        <div className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#fff8ef_0%,#f8e4cd_100%)] p-5 shadow-[0_24px_60px_rgba(122,73,34,0.08)] sm:p-7">
-          <p className="text-sm font-semibold text-[#d97745]">오늘 뭐 먹을지 고민될 때</p>
-          <h1 className="mt-3 font-['Cormorant_Garamond'] text-4xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-5xl">
-            검색하고,
-            <br />
-            바로 괜찮은 곳만
-            <br />
-            골라보세요.
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-600 sm:text-base">
-            분위기, 메뉴, 지역에 맞는 맛집을 빠르게 보고 예약까지 이어서 갈 수 있게
-            만든 메인 홈 화면입니다.
-          </p>
-
-          <div className="mt-6 rounded-[1.6rem] bg-white p-3 shadow-sm">
-            <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_1fr_auto]">
-              <button
-                className={`rounded-2xl bg-[#f8f3ed] px-4 py-3 text-left ${hoverSoftButton}`}
-                onClick={() => navigateTo("#/search")}
-              >
-                <p className="text-xs text-stone-400">어떤 메뉴 찾고 있어요?</p>
-                <p className="mt-1 text-sm font-medium text-stone-700">
-                  파스타, 브런치, 와인바
-                </p>
-              </button>
-              <button
-                className={`rounded-2xl bg-[#f8f3ed] px-4 py-3 text-left ${hoverSoftButton}`}
-                onClick={() => navigateTo("#/search")}
-              >
-                <p className="text-xs text-stone-400">분위기</p>
-                <p className="mt-1 text-sm font-medium text-stone-700">데이트</p>
-              </button>
-              <button
-                className={`rounded-2xl bg-[#f8f3ed] px-4 py-3 text-left ${hoverSoftButton}`}
-                onClick={() => navigateTo("#/search")}
-              >
-                <p className="text-xs text-stone-400">지역</p>
-                <p className="mt-1 text-sm font-medium text-stone-700">성수, 한남</p>
-              </button>
-              <button
-                className={`rounded-2xl bg-[#d97745] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#c96a3a] ${hoverSoftButton}`}
-                onClick={() => navigateTo("#/search")}
-              >
-                검색
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {quickFilters.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => navigateTo(`#/collection/${encodeURIComponent(filter)}`)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  filter === "전체"
-                    ? "bg-[#d97745] text-white"
-                    : "bg-white text-stone-600 hover:bg-[#f3e7d8]"
-                } ${hoverSoftButton}`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-lg font-semibold text-stone-900">카테고리</p>
-              <p className="text-sm text-stone-500">원하는 메뉴부터 바로 골라보세요</p>
-            </div>
-            <button
-              className="text-sm font-medium text-[#d97745] transition hover:text-[#c96a3a]"
-              onClick={() => navigateTo("#/search")}
-            >
-              전체 보기
-            </button>
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {categoryItems.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => navigateTo(item.route)}
-                className={`rounded-[1.4rem] bg-[#fbf6f0] px-3 py-4 text-center transition hover:bg-[#f3e7d8] ${hoverLiftCard}`}
-              >
-                <div className="text-2xl">{item.emoji}</div>
-                <p className="mt-2 text-sm font-medium text-stone-700">{item.label}</p>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-lg font-semibold text-stone-900">상황별 추천</p>
-              <p className="text-sm text-stone-500">지금 필요한 상황에 맞춰 골라봤어요</p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            {situationSections.map((section) => (
-              <article
-                key={section.title}
-                className={`rounded-[1.6rem] bg-[#fbf6f0] p-5 ${hoverLiftCard}`}
-              >
-                <button
-                  className="text-left transition hover:text-[#c96a3a]"
-                  onClick={() => navigateTo(section.route)}
-                >
-                  <h3 className="text-lg font-semibold text-stone-900">{section.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-stone-600">{section.text}</p>
-                </button>
-                <div className="mt-4 space-y-2">
-                  {section.items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => navigateTo(`#/restaurant/${item.id}`)}
-                      className={`block w-full rounded-2xl bg-white px-4 py-3 text-left text-sm font-medium text-stone-700 ${hoverSoftButton}`}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      </section>
-
-      <aside className="space-y-5">
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-lg font-semibold text-stone-900">지금 추천</p>
-              <p className="text-sm text-stone-500">바로 보기 좋은 곳</p>
-            </div>
-            <button className="text-sm font-medium text-[#d97745]">새로고침</button>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {featuredRestaurants.slice(0, 2).map((card, index) => (
-              <button
-                key={card.name}
-                onClick={() => navigateTo(`#/restaurant/${card.id}`)}
-                className={`block w-full overflow-hidden rounded-[1.6rem] p-4 text-left ${
-                  index === 0
-                    ? "bg-[linear-gradient(135deg,#d97745_0%,#e9a56f_100%)] text-white"
-                    : "bg-[#fbf6f0] text-stone-900"
-                } ${hoverLiftCard}`}
-              >
-                <p
-                  className={`text-xs font-semibold ${
-                    index === 0 ? "text-orange-100" : "text-[#d97745]"
-                  }`}
-                >
-                  {card.badge}
-                </p>
-                <h3 className="mt-2 text-xl font-semibold">{card.name}</h3>
-                <p
-                  className={`mt-2 text-sm ${
-                    index === 0 ? "text-orange-50" : "text-stone-600"
-                  }`}
-                >
-                  {card.detail}
-                </p>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm">
-          <div>
-            <p className="text-lg font-semibold text-stone-900">근처에서 바로 갈 수 있는 곳</p>
-            <p className="text-sm text-stone-500">예약 가능한 시간도 같이 보여줘요</p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {nearbyPlaces.map((place) => (
-              <button
-                key={place.name}
-                onClick={() => navigateTo(`#/restaurant/${place.id}`)}
-                className={`block w-full rounded-[1.4rem] bg-[#fbf6f0] p-4 text-left ${hoverLiftCard}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-stone-900">{place.name}</h3>
-                    <p className="mt-1 text-sm text-stone-500">{place.area}</p>
-                  </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#d97745]">
-                    {place.slot}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm text-stone-600">{place.meta}</p>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] bg-[#2f241f] p-5 text-white shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-lg font-semibold">오늘 예약 가능</p>
-              <p className="text-sm text-stone-300">지금 바로 잡을 수 있는 시간</p>
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {reservationItems.map((item) => (
-              <div
-                key={`${item.name}-${item.time}`}
-                className="flex items-center justify-between rounded-[1.2rem] bg-white/10 px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-stone-300">{item.seats}</p>
-                </div>
-                <button
-                  className={`rounded-full bg-white px-4 py-2 text-sm font-semibold text-stone-900 ${hoverSoftButton}`}
-                  onClick={() => navigateTo("#/reserve")}
-                >
-                  {item.time}
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      </aside>
-    </main>
-  );
-}
-
-function PageHeader({ eyebrow, title, description, actionLabel, onAction }) {
-  return (
-    <div className="rounded-[2rem] bg-[#fff8ef] p-6 shadow-sm sm:p-8">
-      <p className="text-sm font-semibold text-[#d97745]">{eyebrow}</p>
-      <h1 className="mt-3 font-['Cormorant_Garamond'] text-4xl font-semibold text-stone-900 sm:text-5xl">
-        {title}
-      </h1>
-      <p className="mt-4 max-w-3xl text-sm leading-7 text-stone-600 sm:text-base">
-        {description}
-      </p>
-      {actionLabel ? (
-        <button
-          onClick={onAction}
-          className={`mt-5 rounded-full bg-[#d97745] px-5 py-2.5 text-sm font-semibold text-white ${hoverSoftButton}`}
-        >
-          {actionLabel}
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function SearchDemoPage() {
-  return (
-    <main className="mt-5 space-y-5">
-      <PageHeader
-        eyebrow="검색 데모"
-        title="검색 결과 화면 데모"
-        description="홈에서 검색 버튼을 눌렀을 때 이동하는 예시 페이지입니다. 실제 서비스에서는 필터, 정렬, 지도, 리뷰 수가 여기에 붙게 됩니다."
-        actionLabel="홈으로 돌아가기"
-        onAction={() => navigateTo("#/")}
-      />
-
-      <section className="rounded-[2rem] bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-wrap gap-2">
-          {["데이트", "한남동", "와인바", "예약 가능"].map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-[#fbf6f0] px-4 py-2 text-sm font-medium text-stone-600"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          {featuredRestaurants.map((restaurant) => (
-            <button
-              key={restaurant.id}
-              onClick={() => navigateTo(`#/restaurant/${restaurant.id}`)}
-              className={`rounded-[1.6rem] border border-stone-100 p-5 text-left transition hover:border-[#d97745] ${hoverLiftCard}`}
-            >
-              <p className="text-xs font-semibold text-[#d97745]">{restaurant.badge}</p>
-              <h3 className="mt-2 text-xl font-semibold text-stone-900">{restaurant.name}</h3>
-              <p className="mt-2 text-sm text-stone-600">{restaurant.detail}</p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-stone-500">
-                <span>{restaurant.area}</span>
-                <span>{restaurant.mood}</span>
-                <span>{restaurant.price}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function CategoryDemoPage({ slug }) {
-  const category = categoryItems.find((item) => item.route.endsWith(slug));
-  const title = category ? `${category.label} 카테고리` : "카테고리";
-
-  return (
-    <main className="mt-5 space-y-5">
-      <PageHeader
-        eyebrow="카테고리 데모"
-        title={`${title} 결과 페이지`}
-        description="카테고리 버튼을 눌렀을 때 보이는 예시 화면입니다. 이 페이지에는 해당 메뉴에 맞는 리스트와 필터 조합을 넣을 수 있습니다."
-        actionLabel="홈으로 돌아가기"
-        onAction={() => navigateTo("#/")}
-      />
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        {featuredRestaurants.map((restaurant) => (
-          <button
-            key={restaurant.id}
-            onClick={() => navigateTo(`#/restaurant/${restaurant.id}`)}
-            className={`rounded-[1.6rem] bg-white p-5 text-left shadow-sm ${hoverLiftCard}`}
-          >
-            <div className="h-36 rounded-[1.2rem] bg-[linear-gradient(135deg,#f3d5ba_0%,#e9a56f_100%)]" />
-            <h3 className="mt-4 text-lg font-semibold text-stone-900">{restaurant.name}</h3>
-            <p className="mt-2 text-sm text-stone-600">{restaurant.detail}</p>
-          </button>
-        ))}
-      </section>
-    </main>
-  );
-}
-
-function RestaurantDemoPage({ id }) {
-  const restaurant =
-    featuredRestaurants.find((item) => item.id === id) ||
-    nearbyPlaces.find((item) => item.id === id) || {
-      name: "데모 레스토랑",
-      area: "서울",
-      detail: "상세 페이지 데모",
-      mood: "편안한 식사",
-      price: "1인 25,000원대",
-      time: "오늘 예약 가능"
-    };
-
-  return (
-    <main className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-      <section className="space-y-5">
-        <PageHeader
-          eyebrow="맛집 상세 데모"
-          title={restaurant.name}
-          description={`${restaurant.area}에 있는 맛집 상세 예시 화면입니다. 사진, 메뉴, 리뷰, 위치, 예약 버튼이 들어가는 자리를 데모용으로 구성했습니다.`}
-          actionLabel="예약 화면 보기"
-          onAction={() => navigateTo("#/reserve")}
-        />
-
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm sm:p-6">
-          <div className="h-64 rounded-[1.6rem] bg-[linear-gradient(135deg,#f2d2b3_0%,#d97745_100%)]" />
-          <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-[1.4rem] bg-[#fbf6f0] p-4">
-              <p className="text-xs text-stone-400">분위기</p>
-              <p className="mt-1 font-medium text-stone-800">{restaurant.mood || restaurant.meta}</p>
-            </div>
-            <div className="rounded-[1.4rem] bg-[#fbf6f0] p-4">
-              <p className="text-xs text-stone-400">가격대</p>
-              <p className="mt-1 font-medium text-stone-800">{restaurant.price || "1인 30,000원대"}</p>
-            </div>
-            <div className="rounded-[1.4rem] bg-[#fbf6f0] p-4">
-              <p className="text-xs text-stone-400">예약 가능</p>
-              <p className="mt-1 font-medium text-stone-800">{restaurant.time || restaurant.slot}</p>
-            </div>
-          </div>
-        </section>
-      </section>
-
-      <aside className="space-y-5">
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm">
-          <p className="text-lg font-semibold text-stone-900">메뉴 미리보기</p>
-          <div className="mt-4 space-y-3">
-            {["시그니처 파스타", "스테이크 플레이트", "하우스 와인"].map((menu) => (
-              <div key={menu} className="rounded-[1.2rem] bg-[#fbf6f0] px-4 py-3 text-sm font-medium">
-                {menu}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] bg-[#2f241f] p-5 text-white shadow-sm">
-          <p className="text-lg font-semibold">예약 액션 데모</p>
-          <p className="mt-2 text-sm text-stone-300">보통 여기서 날짜, 시간, 인원을 고르게 됩니다.</p>
-          <button
-            className={`mt-5 w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-stone-900 ${hoverSoftButton}`}
-            onClick={() => navigateTo("#/reserve")}
-          >
-            예약하러 가기
-          </button>
-        </section>
-      </aside>
-    </main>
-  );
-}
-
-function CollectionDemoPage({ slug }) {
-  const match = situationSections.find(
-    (section) => section.route === `#/collection/${slug}` || section.title === slug
-  );
-  const title = match ? match.title : decodeURIComponent(slug);
-  const items = match ? match.items : featuredRestaurants.map((item) => ({ id: item.id, name: item.name }));
-
-  return (
-    <main className="mt-5 space-y-5">
-      <PageHeader
-        eyebrow="상황별 모음"
-        title={`${title} 추천`}
-        description="홈에서 필터나 상황별 추천 섹션을 눌렀을 때 열리는 모음 페이지 예시입니다."
-        actionLabel="홈으로 돌아가기"
-        onAction={() => navigateTo("#/")}
-      />
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {items.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => navigateTo(`#/restaurant/${item.id}`)}
-            className={`rounded-[1.6rem] bg-white p-5 text-left shadow-sm ${hoverLiftCard}`}
-          >
-            <div className="h-36 rounded-[1.2rem] bg-[linear-gradient(135deg,#fff0de_0%,#efb27d_100%)]" />
-            <h3 className="mt-4 text-lg font-semibold text-stone-900">{item.name}</h3>
-            <p className="mt-2 text-sm text-stone-600">이 상황에 어울리는 맛집으로 노출되는 예시 카드입니다.</p>
-          </button>
-        ))}
-      </section>
-    </main>
-  );
-}
-
-function ReserveDemoPage() {
-  return (
-    <main className="mt-5 grid gap-5 lg:grid-cols-[1fr_0.8fr]">
-      <section className="space-y-5">
-        <PageHeader
-          eyebrow="예약 데모"
-          title="예약 단계 예시 화면"
-          description="시간 선택, 인원 선택, 요청사항 입력처럼 실제 예약 프로세스로 이어질 화면의 데모입니다."
-          actionLabel="홈으로 돌아가기"
-          onAction={() => navigateTo("#/")}
-        />
-
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-[1.4rem] bg-[#fbf6f0] p-4">
-              <p className="text-sm text-stone-500">날짜</p>
-              <p className="mt-2 font-semibold text-stone-900">2026년 7월 14일</p>
-            </div>
-            <div className="rounded-[1.4rem] bg-[#fbf6f0] p-4">
-              <p className="text-sm text-stone-500">인원</p>
-              <p className="mt-2 font-semibold text-stone-900">2명</p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            {["18:00", "18:30", "19:00", "19:30", "20:00", "20:30"].map((time) => (
-              <button
-                key={time}
-                className={`rounded-2xl bg-[#f8f3ed] px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-[#f0dfcb] ${hoverSoftButton}`}
-              >
-                {time}
-              </button>
-            ))}
-          </div>
-        </section>
-      </section>
-
-      <aside className="rounded-[2rem] bg-[#2f241f] p-5 text-white shadow-sm">
-        <p className="text-lg font-semibold">예약 요약</p>
-        <div className="mt-4 space-y-3 text-sm text-stone-300">
-          <p>레스토랑: 한남동 프렌치 다이닝</p>
-          <p>날짜: 2026년 7월 14일</p>
-          <p>인원: 2명</p>
-          <p>요청사항: 창가 자리 우선</p>
-        </div>
-        <button className={`mt-6 w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-stone-900 ${hoverSoftButton}`}>
-          예약 요청하기
-        </button>
-      </aside>
-    </main>
-  );
-}
-
-function LoginDemoPage() {
-  return (
-    <main className="mt-5 flex justify-center">
-      <section className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-sm sm:p-8">
-        <p className="text-sm font-semibold text-[#d97745]">로그인 데모</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-stone-900">다시 만나서 반가워요</h1>
-        <p className="mt-3 text-sm leading-6 text-stone-600">
-          홈 상단의 로그인 버튼을 눌렀을 때 열리는 예시 화면입니다.
-        </p>
-        <div className="mt-6 space-y-3">
-          <div className="rounded-2xl bg-[#fbf6f0] px-4 py-3 text-sm text-stone-500">이메일</div>
-          <div className="rounded-2xl bg-[#fbf6f0] px-4 py-3 text-sm text-stone-500">비밀번호</div>
-        </div>
-        <button className={`mt-5 w-full rounded-full bg-[#d97745] px-4 py-3 text-sm font-semibold text-white ${hoverSoftButton}`}>
-          로그인
-        </button>
-        <button
-          className={`mt-3 w-full rounded-full bg-[#f8f3ed] px-4 py-3 text-sm font-semibold text-stone-700 ${hoverSoftButton}`}
-          onClick={() => navigateTo("#/")}
-        >
-          홈으로 돌아가기
-        </button>
-      </section>
-    </main>
-  );
+function getRoute() {
+  const route = window.location.hash.slice(1) || "/";
+  return route.startsWith("/") ? route : "/";
 }
 
 export default function App() {
-  const [hash, setHash] = useState(getCurrentHash());
+  const [route, setRoute] = useState(getRoute);
+  const [stores, setStores] = useState([]);
+  const [storesLoading, setStoresLoading] = useState(true);
+  const [storesError, setStoresError] = useState("");
+  const [storesReloadKey, setStoresReloadKey] = useState(0);
+  const [session, setSession] = useState(() => {
+    try {
+      return JSON.parse(window.sessionStorage.getItem("matgourmand-session")) || null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
-    const handleHashChange = () => setHash(getCurrentHash());
+    const handleHashChange = () => setRoute(getRoute());
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
-  const path = hash.replace(/^#/, "");
+  useEffect(() => {
+    const controller = new AbortController();
+    setStoresLoading(true);
+    setStoresError("");
+    apiRequest("/api/stores", { signal: controller.signal })
+      .then((data) => setStores(data.filter((store) => store.status !== "HIDDEN").map(mapStore)))
+      .catch((error) => {
+        if (error.name !== "AbortError") setStoresError(error instanceof TypeError ? "서버에 연결할 수 없습니다." : error.message);
+      })
+      .finally(() => { if (!controller.signal.aborted) setStoresLoading(false); });
+    return () => controller.abort();
+  }, [storesReloadKey]);
 
-  let content = <HomePage />;
+  const navigate = (path) => {
+    window.location.hash = path;
+    setRoute(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  if (path === "/search") {
-    content = <SearchDemoPage />;
-  } else if (path === "/reserve") {
-    content = <ReserveDemoPage />;
-  } else if (path === "/login") {
-    content = <LoginDemoPage />;
-  } else if (path.startsWith("/restaurant/")) {
-    content = <RestaurantDemoPage id={path.split("/")[2]} />;
-  } else if (path.startsWith("/category/")) {
-    content = <CategoryDemoPage slug={path.split("/")[2]} />;
-  } else if (path.startsWith("/collection/")) {
-    content = <CollectionDemoPage slug={decodeURIComponent(path.split("/")[2])} />;
+  const handleAuthenticated = (auth) => {
+    const nextSession = { accessToken: auth.accessToken, user: auth.user };
+    window.sessionStorage.setItem("matgourmand-session", JSON.stringify(nextSession));
+    setSession(nextSession);
+    const returnTo = window.sessionStorage.getItem("matgourmand-return-to") || "/";
+    window.sessionStorage.removeItem("matgourmand-return-to");
+    navigate(returnTo);
+  };
+
+  const handleLogout = () => {
+    window.sessionStorage.removeItem("matgourmand-session");
+    setSession(null);
+  };
+
+  const header = (
+    <SiteHeader navigate={navigate} session={session} onLogout={handleLogout} />
+  );
+
+  if (route === "/login" || route === "/signup") {
+    return (
+      <AuthPage
+        key={route}
+        mode={route === "/login" ? "login" : "signup"}
+        navigate={navigate}
+        onAuthenticated={handleAuthenticated}
+        header={header}
+      />
+    );
   }
 
-  return <AppShell>{content}</AppShell>;
+  if (route.startsWith("/stores/")) {
+    const storeId = decodeURIComponent(route.slice("/stores/".length));
+    return (
+      <StoreDetailPage
+        storeId={storeId}
+        navigate={navigate}
+        header={header}
+      />
+    );
+  }
+
+  if (route === "/reservations") {
+    return <ReservationListPage session={session} navigate={navigate} header={header} />;
+  }
+
+  if (route === "/owner/reservations") {
+    return <OwnerReservationPage session={session} navigate={navigate} header={header} />;
+  }
+
+  if (route.startsWith("/reservations/")) {
+    const reservationId = decodeURIComponent(route.slice("/reservations/".length).replace(/\/complete$/, ""));
+    return (
+      <ReservationPage
+        reservationId={reservationId}
+        isComplete={route.endsWith("/complete")}
+        draft={getReservationDraft()}
+        session={session}
+        navigate={navigate}
+        header={header}
+      />
+    );
+  }
+
+  const requestedStoreId = new URLSearchParams(route.split("?")[1] || "").get("store");
+  return <HomePage navigate={navigate} header={header} initialStoreId={requestedStoreId} stores={stores} loading={storesLoading} error={storesError} retry={() => setStoresReloadKey((key) => key + 1)} />;
+}
+
+function HomePage({ navigate, header, initialStoreId, stores, loading, error, retry }) {
+  const initialStore = stores.find((store) => store.id === initialStoreId);
+  const initialDraft = getReservationDraft();
+  const matchingDraft = String(initialDraft?.storeId) === initialStoreId ? initialDraft : null;
+  const [regionQuery, setRegionQuery] = useState(initialStore?.region || "");
+  const [selectedRegion, setSelectedRegion] = useState(initialStore?.region || "");
+  const [selectedTheme, setSelectedTheme] = useState("");
+  const [selectedPrice, setSelectedPrice] = useState("");
+  const [selectedFilters, setSelectedFilters] = useState([]);
+  const [sortBy, setSortBy] = useState("recommended");
+  const [selectedStoreId, setSelectedStoreId] = useState(initialStoreId || "");
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [selectedTime, setSelectedTime] = useState(matchingDraft?.partySize ? matchingDraft.time || "" : "");
+  const [selectedPartySize, setSelectedPartySize] = useState(matchingDraft?.partySize || null);
+  const [selectedDate, setSelectedDate] = useState(matchingDraft?.date >= tomorrowDate() ? matchingDraft.date : tomorrowDate);
+  const [requestNote, setRequestNote] = useState(matchingDraft?.requestNote || "");
+  const [availableTimes, setAvailableTimes] = useState([]);
+  const [timesLoading, setTimesLoading] = useState(false);
+  const [timesError, setTimesError] = useState("");
+  const [timesReloadKey, setTimesReloadKey] = useState(0);
+  const dialogRef = useRef(null);
+  const triggerRef = useRef(null);
+
+  useEffect(() => {
+    const store = stores.find((item) => item.id === initialStoreId);
+    if (store) {
+      setRegionQuery(store.region);
+      setSelectedRegion(store.region);
+      setSelectedStoreId(store.id);
+      setShowReservationModal(true);
+    }
+  }, [initialStoreId, stores]);
+
+  useEffect(() => {
+    if (!showReservationModal || !selectedStoreId || !selectedDate || !selectedPartySize) {
+      setAvailableTimes([]);
+      setTimesError("");
+      return;
+    }
+    const controller = new AbortController();
+    setTimesLoading(true);
+    setTimesError("");
+    apiRequest(`/api/stores/${encodeURIComponent(selectedStoreId)}/available-times?date=${encodeURIComponent(selectedDate)}&partySize=${selectedPartySize}`, { signal: controller.signal })
+      .then((times) => {
+        setAvailableTimes(times);
+        setSelectedTime((current) => times.includes(current) ? current : "");
+      })
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") {
+          setAvailableTimes([]);
+          setSelectedTime("");
+          setTimesError(requestError instanceof TypeError ? "서버에 연결할 수 없습니다." : requestError.message);
+        }
+      })
+      .finally(() => { if (!controller.signal.aborted) setTimesLoading(false); });
+    return () => controller.abort();
+  }, [showReservationModal, selectedStoreId, selectedDate, selectedPartySize, timesReloadKey]);
+
+  useEffect(() => {
+    if (!showReservationModal) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setShowReservationModal(false);
+      }
+      if (event.key === "Tab") {
+        const focusable = dialogRef.current?.querySelectorAll(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled])'
+        );
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (document.activeElement === dialogRef.current) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      (triggerRef.current || previousFocus)?.focus?.();
+    };
+  }, [showReservationModal]);
+
+  const allRegions = useMemo(() => [...new Set(stores.map((store) => store.region).filter(Boolean))], [stores]);
+  const foodThemes = useMemo(() => [...new Set(stores.map((store) => store.theme).filter(Boolean))], [stores]);
+  const regionSuggestions = useMemo(() => {
+    const query = regionQuery.trim().toLowerCase();
+    if (!query) {
+      return allRegions.slice(0, 6);
+    }
+    return allRegions.filter((region) => region.toLowerCase().includes(query)).slice(0, 6);
+  }, [allRegions, regionQuery]);
+
+  const visibleStores = useMemo(() => {
+    let result = stores.filter((store) => !selectedRegion || store.region === selectedRegion);
+
+    if (!selectedRegion && regionQuery.trim()) {
+      const query = regionQuery.trim().toLowerCase();
+      result = result.filter((store) => `${store.region} ${store.address}`.toLowerCase().includes(query));
+    }
+
+    if (selectedTheme) {
+      result = result.filter((store) => store.theme === selectedTheme);
+    }
+
+    if (selectedPrice) {
+      const range = priceRanges.find((item) => item.key === selectedPrice);
+      result = result.filter((store) => store.averagePrice != null && store.averagePrice >= range.min && store.averagePrice < range.max);
+    }
+
+    if (selectedFilters.includes("available-now")) {
+      result = result.filter((store) => store.availableNow);
+    }
+
+    if (sortBy === "price-low") result = [...result].sort((a, b) => (a.averagePrice ?? Infinity) - (b.averagePrice ?? Infinity));
+    if (sortBy === "price-high") result = [...result].sort((a, b) => (b.averagePrice ?? -1) - (a.averagePrice ?? -1));
+
+    return result;
+  }, [stores, regionQuery, selectedFilters, selectedPrice, selectedRegion, selectedTheme, sortBy]);
+
+  const selectedStore = stores.find((store) => store.id === selectedStoreId) ?? null;
+
+  const toggleFilter = (key) => {
+    setSelectedFilters((prev) => {
+      if (prev.includes(key)) {
+        return prev.filter((item) => item !== key);
+      }
+      return [...prev, key];
+    });
+  };
+
+  const handleSelectRegion = (region) => {
+    setSelectedRegion(region);
+    setRegionQuery(region);
+  };
+
+  const handleResetRegion = () => {
+    setRegionQuery("");
+    setSelectedRegion("");
+  };
+
+  const handleResetFilters = () => {
+    setSelectedRegion("");
+    setRegionQuery("");
+    setSelectedTheme("");
+    setSelectedPrice("");
+    setSelectedFilters([]);
+  };
+
+  const handleSelectStore = (store, trigger) => {
+    triggerRef.current = trigger;
+    if (store.id !== selectedStoreId) {
+      setRequestNote("");
+      setSelectedPartySize(null);
+      setSelectedTime("");
+    }
+    setSelectedStoreId(store.id);
+    setShowReservationModal(true);
+  };
+
+  const handleSelectPartySize = (size) => {
+    if (size !== selectedPartySize) setSelectedTime("");
+    setSelectedPartySize(size);
+  };
+
+  const hasVisibleStores = visibleStores.length > 0;
+
+  const handleReservationPreview = () => {
+    if (!selectedStore || !selectedPartySize || !selectedDate || timesLoading || timesError || !availableTimes.includes(selectedTime)) return;
+    window.sessionStorage.setItem(
+      "matgourmand-reservation-draft",
+      JSON.stringify({
+        storeId: selectedStore.id,
+        storeName: selectedStore.name,
+        region: selectedStore.region,
+        theme: selectedStore.theme,
+        date: selectedDate,
+        time: selectedTime,
+        partySize: selectedPartySize,
+        requestNote: requestNote.trim()
+      })
+    );
+    navigate("/reservations/preview");
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-stone-900">
+      <div className="mx-auto max-w-7xl px-4 pb-14 pt-5 sm:px-6 lg:px-8">
+        {header}
+
+        <main className="mt-5 space-y-5">
+          <section className="space-y-5">
+            <section className="rounded-[2rem] border border-[#f0dfcf] bg-[linear-gradient(135deg,#fff8ef_0%,#f8e4cd_100%)] p-5 shadow-[0_24px_60px_rgba(122,73,34,0.08)] sm:p-7">
+              <p className="text-sm font-semibold text-stone-900">오늘의 식당 찾기</p>
+              <h1 className="mt-3 font-['Cormorant_Garamond'] text-4xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-5xl">
+                지역을 고르고,
+                <br />
+                취향을 더하고,
+                <br />
+                예산에 맞게.
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-600 sm:text-base">
+                가고 싶은 동네, 먹고 싶은 음식, 생각한 가격대를 자유롭게 골라보세요.
+                조건에 맞는 식당을 바로 살펴볼 수 있습니다.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                {highlightBullets.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-white/85 px-4 py-2 text-sm font-medium text-stone-700"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-6">
+              <div>
+                <p className="text-lg font-semibold text-stone-900">나에게 맞는 식당 찾기</p>
+                <p className="text-sm text-stone-500">
+                  지역·음식 테마·가격대는 각각 선택할 수 있어요.
+                </p>
+              </div>
+
+              <div className="mt-5">
+                <label htmlFor="region-search" className="mb-2 block text-sm font-semibold text-stone-700">지역</label>
+                <div className="flex items-center gap-3 rounded-[1.4rem] border border-stone-200 bg-white px-4 py-3 shadow-sm">
+                  <input
+                    id="region-search"
+                    value={regionQuery}
+                    onChange={(event) => {
+                      setRegionQuery(event.target.value);
+                      setSelectedRegion("");
+                    }}
+                    placeholder="예: 성수, 한남, 연남"
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-medium text-stone-900 outline-none placeholder:text-stone-400 focus-visible:ring-2 focus-visible:ring-[#dd6b6b]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleResetRegion}
+                    className="shrink-0 rounded-full bg-[#fff1ef] px-3 py-1.5 text-xs font-semibold text-[#bf4f4f] transition hover:bg-[#ffe4e1]"
+                  >
+                    지우기
+                  </button>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetRegion}
+                    aria-pressed={!selectedRegion}
+                    className={`rounded-full px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${!selectedRegion ? "bg-[#dd6b6b] text-white" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}
+                  >
+                    전체 지역
+                  </button>
+                  {regionSuggestions.map((region) => (
+                    <button
+                      key={region}
+                      type="button"
+                      onClick={() => handleSelectRegion(region)}
+                      aria-pressed={selectedRegion === region}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                        selectedRegion === region
+                          ? "bg-[#dd6b6b] text-white"
+                          : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"
+                      }`}
+                    >
+                      {region}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-stone-100 pt-5">
+                <p className="text-sm font-semibold text-stone-700">음식 테마</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {["전체", ...foodThemes].map((theme) => {
+                    const value = theme === "전체" ? "" : theme;
+                    const active = selectedTheme === value;
+                    return (
+                      <button key={theme} type="button" onClick={() => setSelectedTheme(value)} aria-pressed={active} className={`rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${active ? "bg-[#dd6b6b] text-white" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}>
+                        {theme}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-stone-100 pt-5">
+                <p className="text-sm font-semibold text-stone-700">1인 예상 가격대</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[{ key: "", label: "전체 가격" }, ...priceRanges].map((range) => {
+                    const active = selectedPrice === range.key;
+                    return (
+                      <button key={range.key || "all"} type="button" onClick={() => setSelectedPrice(range.key)} aria-pressed={active} className={`rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${active ? "bg-[#dd6b6b] text-white" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}>
+                        {range.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-stone-100 pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-stone-700">추가 조건</p>
+                  <button type="button" onClick={handleResetFilters} className="rounded-full bg-[#fff1ef] px-3 py-1.5 text-xs font-semibold text-[#a94444] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">전체 초기화</button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {filters.map((filter) => {
+                    const active = selectedFilters.includes(filter.key);
+                    return (
+                      <button key={filter.key} type="button" onClick={() => toggleFilter(filter.key)} aria-pressed={active} className={`rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] ${active ? "bg-[#fff1ef] text-[#a94444] ring-1 ring-[#eab0aa]" : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"}`}>
+                        {filter.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-6">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-stone-900">조건에 맞는 식당</p>
+                  <p className="text-sm text-stone-500">
+                    식당을 누르면 예약 창이 열립니다. 상세 정보도 확인해 보세요.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <p aria-live="polite" className="text-sm font-medium text-stone-500">
+                    {visibleStores.length}개 결과
+                  </p>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+                    정렬
+                    <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">
+                      {sortOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              {loading ? (
+                <p role="status" className="mt-5 rounded-[1.6rem] bg-[#fbf6f0] px-5 py-8 text-center text-sm text-stone-600">식당을 불러오는 중입니다...</p>
+              ) : error ? (
+                <div role="alert" className="mt-5 rounded-[1.6rem] bg-[#fbf6f0] px-5 py-8 text-center text-sm text-stone-700">
+                  <p>{error}</p>
+                  <button type="button" onClick={retry} className="mt-4 rounded-full bg-[#dd6b6b] px-5 py-2.5 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">다시 시도</button>
+                </div>
+              ) : hasVisibleStores ? (
+                <div className="fade-slide-up mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {visibleStores.map((store) => {
+                    return (
+                      <div
+                        key={store.id}
+                        className="rounded-[1.6rem] border border-stone-100 bg-white p-4 text-left transition hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
+                      >
+                        <button
+                          type="button"
+                          onClick={(event) => handleSelectStore(store, event.currentTarget)}
+                          aria-label={`${store.name} 예약 창 열기`}
+                          className="block w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]"
+                        >
+                        <div className={`h-36 rounded-[1.2rem] ${store.thumbnail}`} />
+                        <div className="mt-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="text-lg font-semibold text-stone-900">
+                                {store.name}
+                              </h3>
+                              <p className="mt-1 text-sm text-stone-500">{store.summary}</p>
+                            </div>
+                            {store.theme && <span className="rounded-full bg-[#fff1ef] px-3 py-1 text-xs font-semibold text-[#bf4f4f]">{store.theme}</span>}
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                            <span className="text-stone-500">{store.region || store.address}{store.averagePrice != null ? ` · 약 ${store.averagePrice.toLocaleString("ko-KR")}원/인` : ""}</span>
+                            <span
+                              className={`font-semibold ${
+                                store.availableNow ? "text-[#bf4f4f]" : "text-stone-400"
+                              }`}
+                            >
+                              {store.availableNow ? "예약 접수 중" : "예약 접수 중지"}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="mt-4 inline-block text-sm font-semibold text-[#a94444]">예약하기 →</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/stores/${store.id}`)}
+                          className="mt-4 rounded-lg text-sm font-semibold text-[#a94444] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]"
+                        >
+                          상세 보기 →
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-[1.6rem] bg-[#fbf6f0] px-5 py-8 text-center text-sm text-stone-500">
+                  {stores.length === 0 ? "등록된 식당이 아직 없어요." : "현재 선택한 조건에 맞는 식당이 없어요. 조건을 바꾸거나 초기화해 보세요."}
+                </div>
+              )}
+            </section>
+          </section>
+
+          {showReservationModal && selectedStore && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+              <button type="button" aria-label="예약 창 닫기" onClick={() => setShowReservationModal(false)} className="absolute inset-0 bg-stone-950/60" />
+              <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="reservation-dialog-title" tabIndex={-1} className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-[#f7f1e8] p-4 shadow-[0_30px_100px_rgba(28,20,16,0.35)] outline-none sm:max-h-[calc(100dvh-3rem)] sm:p-6">
+                <div className="mb-5 flex items-start justify-between gap-4 px-1">
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.14em] text-[#a94444]">RESERVATION</p>
+                    <h2 id="reservation-dialog-title" className="mt-1 text-2xl font-semibold text-stone-900">{selectedStore.name} 예약하기</h2>
+                    <p className="mt-1 text-sm text-stone-600">날짜와 인원수를 고른 뒤 시간대를 선택해 보세요.</p>
+                  </div>
+                  <button type="button" onClick={() => setShowReservationModal(false)} aria-label="예약 창 닫기" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl text-stone-700 hover:bg-[#fff1ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]">×</button>
+                </div>
+                <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+                <section className="order-2 rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:order-1">
+                  <p className="text-sm font-semibold text-stone-900">선택한 가게</p>
+                  <div className={`mt-4 h-44 rounded-[1.4rem] ${selectedStore.thumbnail}`} />
+                  <h2 className="mt-4 text-2xl font-semibold text-stone-900">
+                    {selectedStore.name}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-stone-600">
+                    {selectedStore.summary}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {selectedStore.region && <span className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600">{selectedStore.region}</span>}
+                    {selectedStore.theme && <span className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600">{selectedStore.theme}</span>}
+                    <span className="rounded-full bg-[#fbf6f0] px-3 py-1 text-xs font-medium text-stone-600">{selectedStore.address}</span>
+                  </div>
+                </section>
+
+                <section className="order-1 rounded-[2rem] border border-stone-100 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:order-2">
+                  <p className="text-lg font-semibold text-stone-900">예약 내용 선택</p>
+                  <p className="mt-1 text-sm text-stone-500">
+                    날짜와 인원수를 고른 뒤 시간대를 선택해 보세요.
+                  </p>
+
+                  <div className="mt-5">
+                    <label htmlFor="reservation-date" className="text-sm font-medium text-stone-700">예약 날짜</label>
+                    <input id="reservation-date" type="date" min={tomorrowDate()} value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); setSelectedTime(""); }} className="mt-3 block w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]" />
+                  </div>
+
+                  <div className="mt-5">
+                    <p className="text-sm font-medium text-stone-700">인원수</p>
+                    <div className="mt-3 grid grid-cols-3 gap-3">
+                      {partySizes.map((size) => (
+                        <button
+                          type="button"
+                          key={size}
+                          onClick={() => handleSelectPartySize(size)}
+                          aria-pressed={selectedPartySize === size}
+                          className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                            selectedPartySize === size
+                              ? "bg-[#dd6b6b] text-white"
+                              : "bg-[#fbf6f0] text-stone-700 hover:bg-[#f3e7d8]"
+                          }`}
+                        >
+                          {size}명
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <label htmlFor="reservation-time" className="text-sm font-medium text-stone-700">예약 시간대</label>
+                    <select
+                      id="reservation-time"
+                      value={selectedTime}
+                      onChange={(event) => setSelectedTime(event.target.value)}
+                      disabled={!selectedPartySize || timesLoading || Boolean(timesError) || availableTimes.length === 0}
+                      className="mt-3 block w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-500"
+                    >
+                      <option value="" disabled>
+                        {!selectedPartySize ? "먼저 인원수를 선택하세요" : timesLoading ? "시간대를 확인하는 중입니다" : timesError ? "시간대를 불러오지 못했어요" : availableTimes.length ? "시간대를 선택하세요" : "선택 가능한 시간대가 없습니다"}
+                      </option>
+                      {availableTimes.map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                    {timesError && <div role="alert" className="mt-2 flex items-center gap-3 text-xs text-[#a94444]"><span>{timesError}</span><button type="button" onClick={() => setTimesReloadKey((key) => key + 1)} className="font-semibold underline">다시 시도</button></div>}
+                    {selectedPartySize && !timesLoading && !timesError && <p className="mt-2 text-xs text-stone-500">영업시간과 잔여석을 기준으로 표시합니다. 예약 접수 시 다시 확인합니다.</p>}
+                  </div>
+
+                  <div className="mt-5">
+                    <label htmlFor="reservation-note" className="text-sm font-medium text-stone-700">요청 사항 <span className="font-normal text-stone-400">(선택)</span></label>
+                    <textarea id="reservation-note" maxLength={500} rows={3} value={requestNote} onChange={(event) => setRequestNote(event.target.value)} placeholder="예: 조용한 자리 부탁드립니다" className="mt-3 block w-full resize-none rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f]" />
+                  </div>
+
+                  <div className="mt-6 rounded-[1.4rem] bg-[#fbf6f0] p-4">
+                    <p className="text-sm text-stone-500">예약 요약</p>
+                    <p className="mt-2 font-semibold text-stone-900">{selectedStore.name}</p>
+                    <p className="mt-1 text-sm text-stone-600">
+                      {selectedStore.region} · {selectedDate || "날짜 미선택"} · {selectedPartySize ? `${selectedPartySize}명` : "인원 미선택"} · {selectedTime || "시간 미선택"}
+                    </p>
+                  </div>
+
+                  <button type="button" onClick={handleReservationPreview} disabled={!selectedDate || !selectedPartySize || timesLoading || Boolean(timesError) || !availableTimes.includes(selectedTime)} className="mt-5 w-full rounded-full bg-[#dd6b6b] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#d15c5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bf4f4f] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600">
+                    예약 내용 확인
+                  </button>
+                  <p className="mt-3 text-center text-xs leading-5 text-stone-500">다음 화면에서 내용을 확인한 뒤 예약을 접수할 수 있습니다.</p>
+                </section>
+                </div>
+              </section>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
 }
